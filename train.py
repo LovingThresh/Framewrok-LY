@@ -5,10 +5,7 @@
 # @File    : train.py
 # @Software: PyCharm
 import os
-import json
 import torch
-import shutil
-import datetime
 
 from accelerate import Accelerator
 
@@ -19,6 +16,12 @@ from utils.visualize import visualize_save_pair
 accelerator = Accelerator()
 device = accelerator.device
 
+MEAN = [0.485, 0.456, 0.406]
+STD = [0.229, 0.224, 0.225]
+
+mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
+std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
+
 
 def Metrics2Value(dict_Metrics):
     for i in dict_Metrics:
@@ -27,7 +30,7 @@ def Metrics2Value(dict_Metrics):
 
 
 def calculate_loss(loss_fn, loss_dict: dict, output, target):
-    sum_loss = torch.tensor(0)
+    sum_loss = torch.tensor(0, device='cuda', dtype=torch.float32)
     assert isinstance(loss_fn, dict)
     for loss_name, loss_function in loss_fn.items():
         loss_value = loss_function(output, target)
@@ -38,20 +41,25 @@ def calculate_loss(loss_fn, loss_dict: dict, output, target):
     return sum_loss, loss_dict
 
 
+def eval_mode(output, target):
+    return output[:, 0:1, :, :], target[:, 0:1, :, :].long()
+
+
 def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None):
     assert isinstance(eval_fn, dict)
 
     if mode_function is not None:
         output, target = mode_function(output, target)
 
+    output, target = output.reshape((-1)), target.reshape((-1))
     for eval_name, eval_function in eval_fn.items():
-        eval_value = eval_function(output, target)
+        eval_value = eval_function(output.cpu(), target.cpu())
         eval_dict[eval_name].update(eval_value.item(), output.size(0))
 
     return eval_dict
 
 
-def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler, epoch, Epochs, mode=None):
+def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler, epoch, Epochs):
     it = 0
     train_loss_dict = {}
     train_eval_dict = {}
@@ -74,16 +82,17 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
         accelerator.backward(loss)
         optimizer.step()
 
-        print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
-        print(train_loss_dict)
-        print("-" * 80)
+        if it % 50 == 0:
+            print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
+            print(train_loss_dict)
+            print("-" * 80)
 
     scheduler.step()
 
     # evaluate the last batch
-    with torch.no_grad:
+    with torch.no_grad():
         train_eval_dict = \
-            calculate_eval(eval_fn, train_eval_dict, output, target, mode_function=mode)
+            calculate_eval(eval_fn, train_eval_dict, output, target, mode_function=eval_mode)
     print("Epoch:{}/{}, Last Iter Evaluation:,".format(epoch, Epochs))
     print(train_eval_dict)
     print("-" * 80)
@@ -91,7 +100,7 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
     return train_loss_dict, train_eval_dict
 
 
-def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mode=None):
+def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
     it = 0
     validation_loss_dict = {}
     validation_eval_dict = {}
@@ -110,18 +119,19 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mod
         loss, validation_loss_dict = \
             calculate_loss(loss_fn, validation_loss_dict, output, target)
         validation_eval_dict = \
-            calculate_eval(eval_fn, validation_eval_dict, output, target, mode_function=mode)
+            calculate_eval(eval_fn, validation_eval_dict, output, target, mode_function=eval_mode)
 
-        print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(eval_load)))
-        print(validation_loss_dict)
-        print(validation_eval_dict)
-        print("-" * 80)
+        if it % 20 == 0:
+            print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(eval_load)))
+            print(validation_loss_dict)
+            print(validation_eval_dict)
+            print("-" * 80)
 
     return validation_loss_dict, validation_eval_dict
 
 
 def train(train_model, optimizer, loss_fn, eval_fn,
-          train_load, val_load, epochs, scheduler, Device,
+          train_load, val_load, epochs, scheduler,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
           experiment, comet=False, init_epoch=1, mode=None):
     train_model, optimizer, train_load, val_load = accelerator.prepare(train_model, optimizer, train_load,
@@ -135,23 +145,22 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             train_model.train()
             train_loss_dict, train_eval_dict = train_epoch(train_model, train_load, loss_fn, eval_fn,
-                                                           optimizer, scheduler, epoch, epochs, mode=mode)
+                                                           optimizer, scheduler, epoch, epochs)
             with torch.no_grad():
                 validation_loss_dict, validation_eval_dict = validation_epoch(train_model, val_load, loss_fn, eval_fn,
-                                                                              epoch, epochs, mode=mode)
+                                                                              epoch, epochs)
             train_loss_dict, train_eval_dict, \
             validation_loss_dict, validation_eval_dict = Metrics2Value(train_loss_dict), \
                                                          Metrics2Value(train_eval_dict), \
                                                          Metrics2Value(validation_loss_dict), \
                                                          Metrics2Value(validation_eval_dict)
 
-            train_dict, validation_dict = {'train_loss': train_loss_dict, 'train_eval': train_eval_dict}, \
-                                     {'validation_loss': validation_loss_dict, 'validation_eval': validation_eval_dict}
+            train_dict, validation_dict = {'loss': train_loss_dict, 'eval': train_eval_dict}, \
+                                          {'loss': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
             if B_comet:
-                experiment_comet.log(train_dict)
-                experiment_comet.log(validation_dict)
+                experiment_comet.log({'train/': train_dict, 'valid/': validation_dict, 'lr': optimizer.optimizer.defaults['lr']})
 
             # 这一部分可以根据任务进行调整
             metric = sorted(validation_eval_dict.items())[0][0]
@@ -164,7 +173,7 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')
-            visualize_save_pair(train_model, val_load, save_path, epoch, mode=mode)
+            visualize_save_pair(train_model, val_load, mean, std, save_path, epoch, mode=mode)
 
             if (epoch % 100) == 0:
                 save_checkpoint_path = os.path.join(output_dir, 'checkpoint')
@@ -176,5 +185,6 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                     "lr_schedule_state_dict": scheduler.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict()
                 }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
-
+        if experiment_comet:
+            experiment.finish()
     train_process(comet, experiment)

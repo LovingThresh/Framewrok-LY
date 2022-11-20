@@ -5,18 +5,26 @@
 # @File    : main.py
 # @Software: PyCharm
 from logger import wandb
+from logger.copy import copy_and_upload
 
-import torch
 import random
-import numpy as np
+import datetime
 
-import train
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from torch.utils.tensorboard import SummaryWriter
+import torchmetrics
+
+from train import *
+from model.model import *
+from evaluation.metrics import *
+from data.data_loader import get_Image_Mask_Dataset
+# from utils.visualize import visualize_pair
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-train_comet = False
-autocast_button = False
+train_comet = True
 
 random.seed(48)
 np.random.seed(48)
@@ -26,28 +34,101 @@ torch.cuda.manual_seed_all(48)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-
 hyper_params = {
-    "mode": 'image',
+    "mode": 'segmentation',
     "ex_number": 'EDSR_3080Ti_Image',
     "raw_size": (3, 512, 512),
     "crop_size": (3, 256, 256),
     "input_size": (3, 256, 256),
     "batch_size": 4,
     "learning_rate": 1e-4,
-    "epochs": 200,
+    "epochs": 2,
     "threshold": 28,
     "checkpoint": False,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": r'F:\BJM\Motion_Image\2022-08-24-14-59-27.160160\save_model\Epoch_10_eval_16.614881643454233.pt'
+    "check_path": r''
 }
+
+experiment = object
+lr = hyper_params['learning_rate']
+mode = hyper_params['mode']
+Epochs = hyper_params['epochs']
+src_path = hyper_params['src_path']
+batch_size = hyper_params['batch_size']
+raw_size = hyper_params['raw_size'][1:]
+crop_size = hyper_params['crop_size'][1:]
+input_size = hyper_params['input_size'][1:]
+threshold = hyper_params['threshold']
+Checkpoint = hyper_params['checkpoint']
+Img_Recon = hyper_params['Img_Recon']
+check_path = hyper_params['check_path']
 
 # ===============================================================================
 # =                                    Comet                                    =
 # ===============================================================================
 
 if train_comet:
-    experiment = wandb.wandb_init(config=hyper_params, project='', notes='', tags='', group='')
+    experiment = wandb.wandb_init(config=hyper_params, project='Image_Enhancement',
+                                  notes=None, tags=None, group='Segmentation')
 
+# ===============================================================================
+# =                                     Data                                    =
+# ===============================================================================
+MEAN = [0.485, 0.456, 0.406]
+STD = [0.229, 0.224, 0.225]
 
+mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
+std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
+
+train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
+
+# ===============================================================================
+# =                                     Model                                   =
+# ===============================================================================
+
+generator = define_G(3, 2, 64, 'resnet_9blocks', learn_residual=False, norm='instance', mode=mode)
+
+eval_function_iou = iou
+eval_function_pr = pr
+eval_function_re = re
+eval_function_f1 = f1
+eval_function_acc = torchmetrics.Accuracy()
+
+loss_function = {'loss_seg': nn.BCELoss()}
+
+eval_function = {'eval_iou': eval_function_iou,
+                 'eval_pr': eval_function_pr,
+                 'eval_re': eval_function_re,
+                 'eval_f1': eval_function_f1,
+                 'eval_acc': eval_function_acc,
+                 }
+
+optimizer_ft = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=10, gamma=0.8)
+
+# ===============================================================================
+# =                                  Copy & Upload                              =
+# ===============================================================================
+
+output_dir = copy_and_upload(hyper_params, src_path)
+timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+train_writer = SummaryWriter('{}/trainer_{}'.format(os.path.join(output_dir, 'summary'), timestamp))
+val_writer = SummaryWriter('{}/valer_{}'.format(os.path.join(output_dir, 'summary'), timestamp))
+
+# ===============================================================================
+# =                                Checkpoint                                   =
+# ===============================================================================
+
+if Checkpoint:
+    checkpoint = torch.load(check_path)
+    generator.load_state_dict(checkpoint)
+    print("Load CheckPoint!")
+
+# ===============================================================================
+# =                                    Training                                 =
+# ===============================================================================
+
+train(generator, optimizer_ft, loss_function, eval_function,
+      train_loader, val_loader, Epochs, exp_lr_scheduler,
+      threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode)
