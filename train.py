@@ -16,8 +16,8 @@ from utils.visualize import visualize_save_pair
 accelerator = Accelerator()
 device = accelerator.device
 
-MEAN = [0.485, 0.456, 0.406]
-STD = [0.229, 0.224, 0.225]
+MEAN = [0.311, 0.307, 0.307]
+STD = [0.165, 0.155, 0.143]
 
 mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
 std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
@@ -185,6 +185,4 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                     "lr_schedule_state_dict": scheduler.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict()
                 }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
-        if experiment_comet:
-            experiment.finish()
     train_process(comet, experiment)

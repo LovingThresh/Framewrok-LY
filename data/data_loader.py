@@ -22,8 +22,8 @@ val_transform = A.Compose([
     A.ToTensorV2(True)
 ])
 
-MEAN = [0.485, 0.456, 0.406]
-STD = [0.229, 0.224, 0.225]
+MEAN = [0.311, 0.307, 0.307]
+STD = [0.165, 0.155, 0.143]
 
 
 train_data_txt = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train.txt'
@@ -46,7 +46,7 @@ class data_prefetcher:
         self.next_target = None
         self.MEAN = mean
         self.STD = std
-        self.num = 50 # len(loader)
+        self.num = len(loader)
         self.loader = iter(loader)
         self.stream = torch.cuda.Stream()
         self.mean = torch.tensor([self.MEAN[0] * 255, self.MEAN[1] * 255, self.MEAN[2] * 255]).cuda().view(1, 3, 1, 1)

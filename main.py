@@ -4,6 +4,8 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : main.py
 # @Software: PyCharm
+import shutil
+
 from logger import wandb
 from logger.copy import copy_and_upload
 
@@ -24,7 +26,7 @@ from data.data_loader import get_Image_Mask_Dataset
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-train_comet = True
+train_comet = False
 
 random.seed(48)
 np.random.seed(48)
@@ -75,8 +77,9 @@ if train_comet:
 # ===============================================================================
 # =                                     Data                                    =
 # ===============================================================================
-MEAN = [0.485, 0.456, 0.406]
-STD = [0.229, 0.224, 0.225]
+
+MEAN = [0.311, 0.307, 0.307]
+STD = [0.165, 0.155, 0.143]
 
 mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
 std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
@@ -132,3 +135,11 @@ if Checkpoint:
 train(generator, optimizer_ft, loss_function, eval_function,
       train_loader, val_loader, Epochs, exp_lr_scheduler,
       threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode)
+
+# ===============================================================================
+# =                                    CopyTree                                 =
+# ===============================================================================
+shutil.copytree('{}/trainer_{}'.format(os.path.join(output_dir, 'summary'), timestamp),
+                '{}/Summary/trainer_{}'.format(os.path.join(src_path), timestamp))
+shutil.copytree('{}/valer_{}'.format(os.path.join(output_dir, 'summary'), timestamp),
+                '{}/Summary/valer_{}'.format(os.path.join(src_path), timestamp))
