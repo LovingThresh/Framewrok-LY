@@ -16,7 +16,16 @@ import data.copy_and_paste
 
 train_transform = A.Compose([
     A.RandomCrop(256, 256),
-    A.ToTensorV2(True)
+    data.copy_and_paste.SemanticCopyandPaste(2, r'L:\crack_segmentation_in_UAV_images\UAV_image\images',
+                                             r'L:\crack_segmentation_in_UAV_images\UAV_image\masks',
+                                             shift_x_limit=[-.1, .1],
+                                             shift_y_limit=[-.1, .1],
+                                             rotate_limit=[-.3, .3],
+                                             scale=[1.1, 2],
+                                             # for visualization purpose, adjust scaling to your application
+                                             class_weights=[0, 1],
+                                             p=1),
+    A.ToTensorV2(True),
 ])
 
 val_transform = A.Compose([
@@ -109,10 +118,11 @@ class Custom_Dataset(Dataset):
 
         self.raw_mask = cv2.imread(os.path.join(self.raw_mask_path, self.file_list[item].split(',')[1]), cv2.IMREAD_GRAYSCALE)
 
+        self.raw_mask = np.expand_dims(self.raw_mask, axis=-1)  / 255
+        self.raw_mask = np.concatenate([1 - self.raw_mask, self.raw_mask], axis=-1)
+
         self.transformed = self.transform(image=self.raw_image, mask=self.raw_mask)
-        self.raw_image, self.raw_mask = self.transformed['image'], self.transformed['mask'] / 255
-        self.raw_mask = np.expand_dims(self.raw_mask, axis=0)
-        self.raw_mask = np.concatenate([self.raw_mask, 1 - self.raw_mask], axis=0)
+        self.raw_image, self.raw_mask = self.transformed['image'], self.transformed['mask']
 
         return self.raw_image, self.raw_mask
 

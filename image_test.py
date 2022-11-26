@@ -81,9 +81,9 @@ if train_comet:
 MEAN = [0.311, 0.307, 0.307]
 STD = [0.165, 0.155, 0.143]
 
-mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).view(1, 3, 1, 1)
-std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).view(1, 3, 1, 1)
+mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
+std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
 
 train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 a = next(iter(train_loader))
-visualize_pair(train_loader, crop_size, mean, std, mode=mode)
+image, label = visualize_pair(train_loader, crop_size, mean, std, mode=mode)

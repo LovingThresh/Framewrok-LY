@@ -48,7 +48,7 @@ def visualize_model(model: torch.nn.Module, image, image_pair=False):
 def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='image'):
 
     a = next(iter(train_loader))
-    input_tensor_numpy = a[0][0:1].mul_(std).add_(mean).numpy()
+    input_tensor_numpy = a[0][0:1].mul_(std).add_(mean).cpu().numpy()
     input_tensor_numpy = input_tensor_numpy.transpose(0, 2, 3, 1)
     input_tensor_numpy = input_tensor_numpy.reshape(input_size[0], input_size[1], 3)
     input_tensor_numpy = np.uint8(input_tensor_numpy)
@@ -56,9 +56,9 @@ def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='
         plot(input_tensor_numpy)
 
     if mode == 'image':
-        output_tensor_numpy = a[1][0:1].mul_(std).add_(mean).numpy()
+        output_tensor_numpy = a[1][0:1].mul_(std).add_(mean).cpu().numpy()
     else:
-        output_tensor_numpy = a[1][0:1].numpy()
+        output_tensor_numpy = a[1][0:1].cpu().numpy()
 
     output_tensor_numpy = output_tensor_numpy.transpose(0, 2, 3, 1)
 
@@ -72,6 +72,7 @@ def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='
 
     if plot_switch:
         plot(output_tensor_numpy)
+        print(1)
 
     return input_tensor_numpy, output_tensor_numpy
 
