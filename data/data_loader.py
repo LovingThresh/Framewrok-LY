@@ -12,6 +12,8 @@ import albumentations as A
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
+import data.copy_and_paste
+
 train_transform = A.Compose([
     A.RandomCrop(256, 256),
     A.ToTensorV2(True)

@@ -100,6 +100,97 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
     return train_loss_dict, train_eval_dict
 
 
+def train_generator_epoch(train_generator, train_discriminator, train_load,
+                          loss_fn_generator, loss_fn_generator_extra, loss_fn_discriminator,
+                          eval_fn_generator,
+                          optimizer_generator, optimizer_discriminator,
+                          scheduler_generator, scheduler_discriminator, epoch, Epochs, Device='cuda'):
+    it = 0
+    train_loss_generator_dict = {}
+    train_eval_generator_dict = {}
+
+    train_loss_discriminator_dict = {}
+
+    for loss_metric in loss_fn_generator:
+        train_loss_generator_dict[loss_metric] = AverageMeter()
+
+    for loss_metric in loss_fn_generator_extra:
+        train_loss_generator_dict[loss_metric] = AverageMeter()
+
+    for loss_metric in loss_fn_discriminator:
+        train_loss_discriminator_dict[loss_metric] = AverageMeter()
+
+    for eval_metrics in eval_fn_generator:
+        train_eval_generator_dict[eval_metrics] = AverageMeter()
+
+    D_weight = 0.5
+
+    for batch in train_load:
+        it = it + 1
+
+        optimizer_discriminator.zero_grad()
+        inputs, target = batch
+        # ------------------------------------------------------------------------------------- #
+
+        real_predict = train_discriminator(target)
+        real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
+        loss_dis_real, train_loss_discriminator_dict = \
+            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict, real_predict, real_label)
+        loss_dis_real = loss_dis_real * torch.tensor(D_weight, dtype=torch.float32, device=Device)
+
+        # ------------------------------------------------------------------------------------- #
+
+        fake_output = train_generator(inputs)
+        fake_predict = train_discriminator(fake_output.detach().clone())
+        fake_label = torch.zeros(fake_predict.shape, dtype=torch.float32, device=Device)
+        loss_dis_fake, train_loss_discriminator_dict = \
+            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict, fake_predict, fake_label)
+        loss_dis_fake = loss_dis_fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
+        loss_dis = loss_dis_real + loss_dis_fake
+
+        loss_dis.bacward()
+        optimizer_discriminator.step()
+        # ------------------------------------------------------------------------------------- #
+
+        # ------------------------------------------------------------------------------------- #
+        #                                   Generator Training                                  #
+        # ------------------------------------------------------------------------------------- #
+
+        optimizer_generator.zero_grad()
+        gen_predict = train_generator(fake_output)
+
+        # calculate generator loss
+        loss_gen, train_loss_generator_dict = calculate_loss(loss_fn_generator, train_loss_generator_dict, gen_predict,
+                                                             torch.ones(gen_predict.shape, dtype=torch.float32, device=Device))
+
+        # calculate generator loss extra
+        loss_gen_extra, train_loss_generator_dict = calculate_loss(loss_fn_generator_extra, train_loss_generator_dict,
+                                                                   fake_output, target)
+
+        loss_gen_sum = loss_gen + loss_gen_extra
+        loss_gen_sum.backward()
+        optimizer_generator.step()
+
+        if it % 50 == 0:
+            print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
+            print(train_loss_discriminator_dict)
+            print(train_loss_generator_dict)
+            print("-" * 80)
+
+    scheduler_generator.step()
+    scheduler_discriminator.step()
+    # evaluate the last batch
+
+    with torch.no_grad():
+        train_eval_generator_dict = \
+            calculate_eval(eval_fn_generator, train_eval_generator_dict, fake_output, target, mode_function=eval_mode)
+    print("Epoch:{}/{}, Last Iter Evaluation:,".format(epoch, Epochs))
+    print(train_eval_generator_dict)
+    print("-" * 80)
+
+    return train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict
+
+
 def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
     it = 0
     validation_loss_dict = {}
