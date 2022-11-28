@@ -9,6 +9,7 @@ import torch
 
 from accelerate import Accelerator
 
+from data.data_loader import data_prefetcher
 from logger.metrics import AverageMeter
 from logger.tensorboard import write_summary
 from utils.visualize import visualize_save_pair
@@ -74,6 +75,8 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
 
     for eval_metrics in eval_fn:
         train_eval_dict[eval_metrics] = AverageMeter()
+
+    train_load = data_prefetcher(train_load, MEAN, STD)
 
     for batch in train_load:
         it = it + 1
@@ -166,7 +169,8 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
 
         # calculate generator loss
         loss_gen, train_loss_generator_dict = calculate_loss(loss_fn_generator, train_loss_generator_dict, gen_predict,
-                                                             torch.ones(gen_predict.shape, dtype=torch.float32, device=Device))
+                                                             torch.ones(gen_predict.shape, dtype=torch.float32,
+                                                                        device=Device))
 
         # calculate generator loss extra
         loss_gen_extra, train_loss_generator_dict = calculate_loss(loss_fn_generator_extra, train_loss_generator_dict,
@@ -207,6 +211,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
     for eval_metrics in eval_fn:
         validation_eval_dict[eval_metrics] = AverageMeter()
 
+    eval_load = data_prefetcher(eval_load, MEAN, STD)
     for batch in eval_load:
         it = it + 1
 
@@ -231,7 +236,7 @@ def train(train_model, optimizer, loss_fn, eval_fn,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
           experiment, comet=False, init_epoch=1, mode=None):
     train_model, optimizer, train_load, val_load, test_load = accelerator.prepare(train_model, optimizer, train_load,
-                                                                       val_load, test_load)
+                                                                                  val_load, test_load)
 
     def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
@@ -257,7 +262,8 @@ def train(train_model, optimizer, loss_fn, eval_fn,
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
             if B_comet:
-                experiment_comet.log({'train/': train_dict, 'valid/': validation_dict, 'lr': optimizer.optimizer.defaults['lr']})
+                experiment_comet.log(
+                    {'train/': train_dict, 'valid/': validation_dict, 'lr': optimizer.optimizer.defaults['lr']})
 
             # 这一部分可以根据任务进行调整
             metric = sorted(validation_eval_dict.items())[2][0]
@@ -282,4 +288,5 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                     "lr_schedule_state_dict": scheduler.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict()
                 }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
+
     train_process(comet, experiment)

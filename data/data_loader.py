@@ -13,7 +13,6 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-import data.copy_and_paste
 
 train_transform = A.Compose([
     A.RandomScale(scale_limit=(1, 1.2), p=0.5),
@@ -98,8 +97,6 @@ class data_prefetcher:
         return self.num
 
     def __getitem__(self, item):
-        it_batch = self.range[item]
-        # print(it_batch)
         return self.next()
 
 
@@ -156,9 +153,4 @@ def get_Image_Mask_Dataset(re_size, batch_size):
     Val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
     Test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
 
-    Train_loader, Val_loader, Test_loader = data_prefetcher(Train_loader, MEAN, STD), \
-                                            data_prefetcher(Val_loader, MEAN, STD), \
-                                            data_prefetcher(Test_loader, MEAN, STD)
-
     return Train_loader, Val_loader, Test_loader
-
