@@ -44,7 +44,7 @@ hyper_params = {
     "raw_size": (3, 512, 512),
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
-    "batch_size": 8,
+    "batch_size": 16,
     "learning_rate": 1e-3,
     "epochs": 100,
     "threshold": 0.7,

@@ -86,8 +86,7 @@ def calculate_loss(loss_fn, loss_dict: dict, output, target):
     assert isinstance(loss_fn, dict)
     for loss_name, loss_function in loss_fn.items():
         loss_value = loss_function(output, target)
-
-        loss_dict[loss_name].update(loss_value.item(), output.size(0))
+        loss_dict[loss_name].update(loss_value, output.size(0))
         sum_loss += loss_value
 
     return sum_loss, loss_dict
@@ -106,7 +105,8 @@ def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None)
     output, target = output.reshape((-1)), target.reshape((-1))
     for eval_name, eval_function in eval_fn.items():
         eval_value = eval_function(output.cpu(), target.cpu())
-        eval_dict[eval_name].update(eval_value.item(), output.size(0))
+        eval_value = eval_value.cuda()
+        eval_dict[eval_name].update(eval_value, output.size(0))
 
     return eval_dict
 
@@ -281,8 +281,8 @@ def train(train_model, optimizer, loss_fn, eval_fn,
           train_load, val_load, epochs, scheduler,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
           experiment, comet=False, init_epoch=1, mode=None):
-    train_model, optimizer, train_load, val_load = accelerator.prepare(train_model, optimizer, train_load,
-                                                                       val_load)
+    train_model, optimizer, scheduler, train_load, val_load = accelerator.prepare(train_model, optimizer, scheduler,
+                                                                                  train_load, val_load)
 
     def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
@@ -303,7 +303,7 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                                                          Metrics2Value(validation_eval_dict)
 
             train_dict, validation_dict = {'loss': train_loss_dict, 'eval': train_eval_dict,
-                                           'lr': {'lr': optimizer.optimizer.defaults['lr']}}, \
+                                           'lr': {'lr': optimizer.state_dict()['param_groups'][0]['lr']}}, \
                                           {'loss': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
