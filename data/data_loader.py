@@ -15,24 +15,27 @@ from torch.utils.data import DataLoader
 import data.copy_and_paste
 
 train_transform = A.Compose([
-    A.RandomCrop(256, 256),
-    data.copy_and_paste.SemanticCopyandPaste(2, r'L:\crack_segmentation_in_UAV_images\UAV_image\images',
-                                             r'L:\crack_segmentation_in_UAV_images\UAV_image\masks',
-                                             shift_x_limit=[-.1, .1],
-                                             shift_y_limit=[-.1, .1],
-                                             rotate_limit=[-.3, .3],
-                                             scale=[1.1, 2],
-                                             # for visualization purpose, adjust scaling to your application
-                                             class_weights=[0, 1],
-                                             p=1),
+    A.RandomScale(scale_limit=(1, 1.2), p=0.5),
+    A.RandomCrop(512, 512),
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.RandomRotate90(p=0.5),
+    A.RandomBrightnessContrast(p=0.5),
+    A.CoarseDropout(p=0.5),
+    A.PixelDropout(p=0.5),
     A.ToTensorV2(True),
 ])
 
 val_transform = A.Compose([
-    A.RandomCrop(256, 256),
+    A.RandomCrop(512, 512),
     A.ToTensorV2(True)
 ])
 
+# UAV_image
+# MEAN = [0.382, 0.372, 0.366]
+# STD = [0.134, 0.122, 0.111]
+
+# earthquake_crack
 MEAN = [0.311, 0.307, 0.307]
 STD = [0.165, 0.155, 0.143]
 

@@ -46,7 +46,6 @@ def visualize_model(model: torch.nn.Module, image, image_pair=False):
 
 
 def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='image'):
-
     a = next(iter(train_loader))
     input_tensor_numpy = a[0][0:1].mul_(std).add_(mean).cpu().numpy()
     input_tensor_numpy = input_tensor_numpy.transpose(0, 2, 3, 1)
@@ -63,7 +62,7 @@ def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='
     output_tensor_numpy = output_tensor_numpy.transpose(0, 2, 3, 1)
 
     if output_tensor_numpy.shape[-1] == 2:
-        output_tensor_numpy = output_tensor_numpy[0, :, :, 0:1].repeat(3, axis=-1)
+        output_tensor_numpy = output_tensor_numpy[0, :, :, 1:].repeat(3, axis=-1)
 
     if mode == 'image':
         output_tensor_numpy = np.uint8(output_tensor_numpy)
@@ -72,19 +71,18 @@ def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='
 
     if plot_switch:
         plot(output_tensor_numpy)
-        print(1)
 
     return input_tensor_numpy, output_tensor_numpy
 
 
 def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_path, epoch, num=0, mode='image'):
-
     a = next(iter(val_loader))
     i = 1
     input_tensor_numpy = a[0][0 + i: 1 + i].mul_(std).add_(mean).cpu().numpy()
     input_tensor_numpy = input_tensor_numpy.transpose(0, 2, 3, 1)
-    input_tensor_numpy = input_tensor_numpy.reshape(input_tensor_numpy.shape[1],input_tensor_numpy.shape[2], 3)
+    input_tensor_numpy = input_tensor_numpy.reshape(input_tensor_numpy.shape[1], input_tensor_numpy.shape[2], 3)
     input_tensor_numpy = np.uint8(input_tensor_numpy)
+    input_tensor_numpy = cv2.cvtColor(input_tensor_numpy, cv2.COLOR_RGB2BGR)
 
     if mode == 'image':
         output_tensor_numpy = a[1][0 + i:1 + i].mul_(std).add_(mean).cpu().numpy()
@@ -126,7 +124,6 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
 
 
 def image2tensor(image_path):
-
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = torch.tensor(image, dtype=torch.float32)
@@ -137,7 +134,6 @@ def image2tensor(image_path):
 
 
 def tensor2array(tensor):
-
     tensor = tensor.squeeze(0)
     tensor = tensor.transpose(0, 2)
     tensor = tensor.transpose(0, 1)

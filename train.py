@@ -16,6 +16,11 @@ from utils.visualize import visualize_save_pair
 accelerator = Accelerator()
 device = accelerator.device
 
+# UAV_image
+# MEAN = [0.382, 0.372, 0.366]
+# STD = [0.134, 0.122, 0.111]
+
+# earthquake_crack
 MEAN = [0.311, 0.307, 0.307]
 STD = [0.165, 0.155, 0.143]
 
@@ -42,7 +47,7 @@ def calculate_loss(loss_fn, loss_dict: dict, output, target):
 
 
 def eval_mode(output, target):
-    return output[:, 0:1, :, :], target[:, 0:1, :, :].long()
+    return output[:, 1:, :, :], target[:, 1:, :, :].long()
 
 
 def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None):
@@ -254,13 +259,13 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                 experiment_comet.log({'train/': train_dict, 'valid/': validation_dict, 'lr': optimizer.optimizer.defaults['lr']})
 
             # 这一部分可以根据任务进行调整
-            metric = sorted(validation_eval_dict.items())[0][0]
+            metric = sorted(validation_eval_dict.items())[2][0]
 
             if validation_eval_dict[metric] > threshold_value:
                 torch.save(train_model.state_dict(),
                            os.path.join(output_dir, 'save_model',
                                         'Epoch_{}_eval_{}.pt'.format(epoch, validation_eval_dict[metric])))
-                threshold_value = validation_eval_dict['eval_function_iou']
+                threshold_value = validation_eval_dict['eval_iou']
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')

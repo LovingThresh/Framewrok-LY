@@ -40,8 +40,8 @@ hyper_params = {
     "mode": 'segmentation',
     "ex_number": 'EDSR_3080Ti_Image',
     "raw_size": (3, 512, 512),
-    "crop_size": (3, 256, 256),
-    "input_size": (3, 256, 256),
+    "crop_size": (3, 512, 512),
+    "input_size": (3, 512, 512),
     "batch_size": 4,
     "learning_rate": 1e-4,
     "epochs": 2,
@@ -78,6 +78,11 @@ if train_comet:
 # =                                     Data                                    =
 # ===============================================================================
 
+# UAV_image
+# MEAN = [0.382, 0.372, 0.366]
+# STD = [0.134, 0.122, 0.111]
+
+# earthquake_crack
 MEAN = [0.311, 0.307, 0.307]
 STD = [0.165, 0.155, 0.143]
 
@@ -86,4 +91,5 @@ std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3,
 
 train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 a = next(iter(train_loader))
-image, label = visualize_pair(train_loader, crop_size, mean, std, mode=mode)
+for i in range(5):
+    image, label = visualize_pair(train_loader, crop_size, mean, std, mode=mode)
