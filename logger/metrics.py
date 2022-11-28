@@ -4,6 +4,9 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : metrics.py
 # @Software: PyCharm
+import torch
+
+
 class AverageMeter:
     """Computes and stores the average and current value"""
     def __init__(self):
@@ -14,10 +17,10 @@ class AverageMeter:
         self.reset()
 
     def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
+        self.val = torch.tensor(0, device='cuda', dtype=torch.float32)
+        self.avg = torch.tensor(0, device='cuda', dtype=torch.float32)
+        self.sum = torch.tensor(0, device='cuda', dtype=torch.float32)
+        self.count = torch.tensor(0, device='cuda', dtype=torch.float32)
 
     def update(self, val, n=1):
         self.val = val
@@ -26,4 +29,4 @@ class AverageMeter:
         self.avg = self.sum / self.count
 
     def __repr__(self):
-        return '[val: ' + str(round(self.val, 4)) + '][' + 'avg: ' + str(round(self.avg, 4)) + ']'
+        return '[val: ' + str(round(self.val.item(), 4)) + '][' + 'avg: ' + str(round(self.avg.item(), 4)) + ']'
