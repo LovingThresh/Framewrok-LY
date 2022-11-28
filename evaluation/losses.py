@@ -212,3 +212,17 @@ class LovaszSoftmax(nn.Module):
         # print(inputs.shape, targets.shape)
         losses = self.lovasz_softmax_flat(inputs, targets)
         return losses
+
+
+class Asymmetry_Binary_Loss(nn.Module):
+    def __init__(self, alpha=100):
+        super().__init__()
+        self.alpha = alpha
+
+    def forward(self, input, target):
+        y_pred, y_true = input, target
+        y_true_0, y_pred_0 = y_true[:, 0, :, :] , y_pred[:, 0, :, :]
+        y_true_1, y_pred_1 = y_true[:, 1, :, :] * self.alpha, y_pred[:, 1, :, :] * self.alpha
+        mse = torch.nn.MSELoss()
+
+        return mse(y_true_0, y_pred_0) + mse(y_true_1, y_pred_1)
