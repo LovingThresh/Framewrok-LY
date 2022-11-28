@@ -227,11 +227,11 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
 
 
 def train(train_model, optimizer, loss_fn, eval_fn,
-          train_load, val_load, epochs, scheduler,
+          train_load, val_load, test_load, epochs, scheduler,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
           experiment, comet=False, init_epoch=1, mode=None):
-    train_model, optimizer, train_load, val_load = accelerator.prepare(train_model, optimizer, train_load,
-                                                                       val_load)
+    train_model, optimizer, train_load, val_load, test_load = accelerator.prepare(train_model, optimizer, train_load,
+                                                                       val_load, test_load)
 
     def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
@@ -251,7 +251,8 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                                                          Metrics2Value(validation_loss_dict), \
                                                          Metrics2Value(validation_eval_dict)
 
-            train_dict, validation_dict = {'loss': train_loss_dict, 'eval': train_eval_dict}, \
+            train_dict, validation_dict = {'loss': train_loss_dict, 'eval': train_eval_dict,
+                                           'lr': {'lr': optimizer.optimizer.defaults['lr']}}, \
                                           {'loss': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
@@ -269,7 +270,7 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')
-            visualize_save_pair(train_model, val_load, mean, std, save_path, epoch, mode=mode)
+            visualize_save_pair(train_model, test_load, mean, std, save_path, epoch, mode=mode)
 
             if (epoch % 100) == 0:
                 save_checkpoint_path = os.path.join(output_dir, 'checkpoint')

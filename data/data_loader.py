@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 import torch
 import albumentations as A
+from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
@@ -23,12 +24,12 @@ train_transform = A.Compose([
     A.RandomBrightnessContrast(p=0.5),
     A.CoarseDropout(p=0.5),
     A.PixelDropout(p=0.5),
-    A.ToTensorV2(True),
+    ToTensorV2(True),
 ])
 
 val_transform = A.Compose([
     A.RandomCrop(512, 512),
-    A.ToTensorV2(True)
+    ToTensorV2(True)
 ])
 
 # UAV_image

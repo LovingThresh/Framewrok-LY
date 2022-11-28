@@ -77,7 +77,7 @@ def visualize_pair(train_loader, input_size, mean, std, plot_switch=True, mode='
 
 def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_path, epoch, num=0, mode='image'):
     a = next(iter(val_loader))
-    i = 1
+    i = 0
     input_tensor_numpy = a[0][0 + i: 1 + i].mul_(std).add_(mean).cpu().numpy()
     input_tensor_numpy = input_tensor_numpy.transpose(0, 2, 3, 1)
     input_tensor_numpy = input_tensor_numpy.reshape(input_tensor_numpy.shape[1], input_tensor_numpy.shape[2], 3)

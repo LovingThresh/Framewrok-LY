@@ -4,6 +4,7 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : main.py
 # @Software: PyCharm
+import math
 import shutil
 
 from logger import wandb
@@ -21,6 +22,7 @@ from train import *
 from model.model import *
 from evaluation.metrics import *
 from data.data_loader import get_Image_Mask_Dataset
+
 # from utils.visualize import visualize_pair
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -38,13 +40,13 @@ torch.backends.cudnn.benchmark = False
 
 hyper_params = {
     "mode": 'segmentation',
-    "ex_number": 'EDSR_3080Ti_Image',
+    "ex_number": '3090_Segmentation_EarthQuake',
     "raw_size": (3, 512, 512),
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
     "batch_size": 4,
-    "learning_rate": 1e-4,
-    "epochs": 2,
+    "learning_rate": 1e-3,
+    "epochs": 5,
     "threshold": 0.7,
     "checkpoint": False,
     "Img_Recon": True,
@@ -65,6 +67,8 @@ threshold = hyper_params['threshold']
 Checkpoint = hyper_params['checkpoint']
 Img_Recon = hyper_params['Img_Recon']
 check_path = hyper_params['check_path']
+
+warm_up_epochs = 5
 
 # ===============================================================================
 # =                                    Comet                                    =
@@ -113,7 +117,11 @@ eval_function = {'eval_iou': eval_function_iou,
                  }
 
 optimizer_ft = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.999))
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=10, gamma=0.8)
+warm_up_with_cosine_lr = lambda epoch: epoch / warm_up_epochs if epoch <= warm_up_epochs \
+    else 0.5 * (math.cos((epoch - warm_up_epochs) / (Epochs - warm_up_epochs) * math.pi) + 1)
+exp_lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer_ft, lr_lambda=warm_up_with_cosine_lr)
+
+# exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=10, gamma=0.8)
 
 # ===============================================================================
 # =                                  Copy & Upload                              =
@@ -138,7 +146,7 @@ if Checkpoint:
 # ===============================================================================
 
 train(generator, optimizer_ft, loss_function, eval_function,
-      train_loader, val_loader, Epochs, exp_lr_scheduler,
+      train_loader, val_loader, test_loader, Epochs, exp_lr_scheduler,
       threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode)
 
 # ===============================================================================
