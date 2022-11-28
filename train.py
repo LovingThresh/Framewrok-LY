@@ -9,7 +9,6 @@ import torch
 
 from accelerate import Accelerator
 
-from data.data_loader import data_prefetcher
 from logger.metrics import AverageMeter
 from logger.tensorboard import write_summary
 from utils.visualize import visualize_save_pair
@@ -27,6 +26,53 @@ STD = [0.165, 0.155, 0.143]
 
 mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
 std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
+
+
+class data_prefetcher:
+    def __init__(self, loader, mean, std):
+        self.next_input = None
+        self.next_target = None
+        self.MEAN = mean
+        self.STD = std
+        self.num = len(loader)
+        self.loader = iter(loader)
+        self.stream = torch.cuda.Stream()
+        self.mean = torch.tensor([self.MEAN[0] * 255, self.MEAN[1] * 255, self.MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
+        self.std = torch.tensor([self.STD[0] * 255, self.STD[1] * 255, self.STD[2] * 255]).cuda().view(1, 3, 1, 1)
+        self.preload()
+        self.range = range(self.num)
+
+    def preload(self):
+        try:
+            self.next_input, self.next_target = next(self.loader)
+        except StopIteration:
+            self.next_input = None
+            self.next_target = None
+            return
+        with torch.cuda.stream(self.stream):
+            self.next_input = self.next_input.cuda(non_blocking=True)
+            self.next_target = self.next_target.cuda(non_blocking=True)
+            # With Amp, it isn't necessary to manually convert data to half.
+            # if args.fp16:
+            #     self.next_input = self.next_input.half()
+            # else:
+            self.next_input = self.next_input.float()
+            self.next_input = self.next_input.sub_(self.mean).div_(self.std)
+            self.next_target = self.next_target.float()
+
+    def next(self):
+        torch.cuda.current_stream().wait_stream(self.stream)
+        input = self.next_input
+        target = self.next_target
+        self.preload()
+        return input, target
+
+    def __len__(self):
+        return self.num
+
+    def __getitem__(self, item):
+        it_batch = self.range[item]
+        return self.next()
 
 
 def Metrics2Value(dict_Metrics):
@@ -90,7 +136,7 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
         accelerator.backward(loss)
         optimizer.step()
 
-        if it % 50 == 0:
+        if it % 100 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
             print(train_loss_dict)
             print("-" * 80)
@@ -222,7 +268,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
         validation_eval_dict = \
             calculate_eval(eval_fn, validation_eval_dict, output, target, mode_function=eval_mode)
 
-        if it % 20 == 0:
+        if it % 50 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(eval_load)))
             print(validation_loss_dict)
             print(validation_eval_dict)
@@ -232,11 +278,11 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
 
 
 def train(train_model, optimizer, loss_fn, eval_fn,
-          train_load, val_load, test_load, epochs, scheduler,
+          train_load, val_load, epochs, scheduler,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
           experiment, comet=False, init_epoch=1, mode=None):
-    train_model, optimizer, train_load, val_load, test_load = accelerator.prepare(train_model, optimizer, train_load,
-                                                                                  val_load, test_load)
+    train_model, optimizer, train_load, val_load = accelerator.prepare(train_model, optimizer, train_load,
+                                                                       val_load)
 
     def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
@@ -276,7 +322,8 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')
-            visualize_save_pair(train_model, test_load, mean, std, save_path, epoch, mode=mode)
+            val_loader = data_prefetcher(val_load, MEAN, STD)
+            visualize_save_pair(train_model, val_loader, mean, std, save_path, epoch, mode=mode)
 
             if (epoch % 100) == 0:
                 save_checkpoint_path = os.path.join(output_dir, 'checkpoint')

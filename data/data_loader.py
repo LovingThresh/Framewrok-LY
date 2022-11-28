@@ -7,7 +7,6 @@
 import os
 import cv2
 import numpy as np
-import torch
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
@@ -31,14 +30,6 @@ val_transform = A.Compose([
     ToTensorV2(True)
 ])
 
-# UAV_image
-# MEAN = [0.382, 0.372, 0.366]
-# STD = [0.134, 0.122, 0.111]
-
-# earthquake_crack
-MEAN = [0.311, 0.307, 0.307]
-STD = [0.165, 0.155, 0.143]
-
 
 train_data_txt = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train.txt'
 val_data_txt = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val.txt'
@@ -52,52 +43,6 @@ raw_val_mask_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val/mas
 
 raw_test_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/img/'
 raw_test_mask_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/mask/'
-
-
-class data_prefetcher:
-    def __init__(self, loader: DataLoader, mean, std):
-        self.next_input = None
-        self.next_target = None
-        self.MEAN = mean
-        self.STD = std
-        self.num = len(loader)
-        self.loader = iter(loader)
-        self.stream = torch.cuda.Stream()
-        self.mean = torch.tensor([self.MEAN[0] * 255, self.MEAN[1] * 255, self.MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
-        self.std = torch.tensor([self.STD[0] * 255, self.STD[1] * 255, self.STD[2] * 255]).cuda().view(1, 3, 1, 1)
-        self.preload()
-        self.range = range(self.num)
-
-    def preload(self):
-        try:
-            self.next_input, self.next_target = next(self.loader)
-        except StopIteration:
-            self.next_input = None
-            self.next_target = None
-            return
-        with torch.cuda.stream(self.stream):
-            self.next_input = self.next_input.cuda(non_blocking=True)
-            self.next_target = self.next_target.cuda(non_blocking=True)
-            # With Amp, it isn't necessary to manually convert data to half.
-            # if args.fp16:
-            #     self.next_input = self.next_input.half()
-            # else:
-            self.next_input = self.next_input.float()
-            self.next_input = self.next_input.sub_(self.mean).div_(self.std)
-            self.next_target = self.next_target.float()
-
-    def next(self):
-        torch.cuda.current_stream().wait_stream(self.stream)
-        input = self.next_input
-        target = self.next_target
-        self.preload()
-        return input, target
-
-    def __len__(self):
-        return self.num
-
-    def __getitem__(self, item):
-        return self.next()
 
 
 class Custom_Dataset(Dataset):

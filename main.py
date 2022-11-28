@@ -146,7 +146,7 @@ if Checkpoint:
 # ===============================================================================
 
 train(generator, optimizer_ft, loss_function, eval_function,
-      train_loader, val_loader, test_loader, Epochs, exp_lr_scheduler,
+      train_loader, val_loader, Epochs, exp_lr_scheduler,
       threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode)
 
 # ===============================================================================
