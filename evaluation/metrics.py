@@ -8,7 +8,8 @@ import torch
 
 
 def iou(input, target):
-
+    target = (target > 0.5).int()
+    input = (input > 0.5).int()
     intersection = input * target
     union = (input + target) - intersection
     Iou = (torch.sum(intersection) + torch.tensor(1e-8)) / (torch.sum(union) + torch.tensor(1e-8))
@@ -16,7 +17,8 @@ def iou(input, target):
 
 
 def pr(input, target):
-
+    target = (target > 0.5).int()
+    input = (input > 0.5).int()
     tp = torch.sum(target * input)
     pp = torch.sum(input)
 
@@ -24,7 +26,8 @@ def pr(input, target):
 
 
 def re(input, target):
-
+    target = (target > 0.5).int()
+    input = (input > 0.5).int()
     tp = torch.sum(target * input)
     pp = torch.sum(target)
 
@@ -32,7 +35,8 @@ def re(input, target):
 
 
 def f1(input, target):
-
+    target = (target > 0.5).int()
+    input = (input > 0.5).int()
     p = pr(input, target)
     r = re(input, target)
 

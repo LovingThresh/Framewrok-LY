@@ -21,6 +21,7 @@ import torchmetrics
 from train import *
 from model.model import *
 from evaluation.metrics import *
+from evaluation.losses import *
 from data.data_loader import get_Image_Mask_Dataset
 
 # from utils.visualize import visualize_pair
@@ -30,10 +31,10 @@ print(f"Using {device} device")
 
 train_comet = False
 
-random.seed(48)
-np.random.seed(48)
-torch.manual_seed(48)
-torch.cuda.manual_seed_all(48)
+random.seed(24)
+np.random.seed(24)
+torch.manual_seed(24)
+torch.cuda.manual_seed_all(24)
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
@@ -46,7 +47,7 @@ hyper_params = {
     "input_size": (3, 512, 512),
     "batch_size": 16,
     "learning_rate": 1e-3,
-    "epochs": 100,
+    "epochs": 200,
     "threshold": 0.7,
     "checkpoint": False,
     "Img_Recon": True,
@@ -107,7 +108,7 @@ eval_function_re = re
 eval_function_f1 = f1
 eval_function_acc = torchmetrics.Accuracy()
 
-loss_function = {'loss_seg': nn.BCELoss()}
+loss_function = {'loss_seg': Asymmetry_Binary_Loss()}
 
 eval_function = {'eval_iou': eval_function_iou,
                  'eval_pr': eval_function_pr,
