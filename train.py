@@ -141,6 +141,10 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
             print(train_loss_dict)
             print("-" * 80)
 
+            with torch.no_grad():
+                train_eval_dict = \
+                    calculate_eval(eval_fn, train_eval_dict, output, target, mode_function=eval_mode)
+
     scheduler.step()
 
     # evaluate the last batch
