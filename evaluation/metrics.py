@@ -10,7 +10,10 @@ import torch
 def iou(input, target):
     target = (target > 0.5).int()
     input = (input > 0.5).int()
-    intersection = input * target
+
+    input_maxpool = torch.nn.MaxPool2d(kernel_size=(5, 5), stride=(1, 1), padding=2)(input)
+
+    intersection = input_maxpool * target
     union = (input + target) - intersection
     Iou = (torch.sum(intersection) + torch.tensor(1e-8)) / (torch.sum(union) + torch.tensor(1e-8))
     return Iou
@@ -19,6 +22,9 @@ def iou(input, target):
 def pr(input, target):
     target = (target > 0.5).int()
     input = (input > 0.5).int()
+
+    input = torch.nn.MaxPool2d(kernel_size=(5, 5), stride=(1, 1), padding=2)(input)
+
     tp = torch.sum(target * input)
     pp = torch.sum(input)
 

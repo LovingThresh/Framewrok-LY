@@ -136,7 +136,7 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
         accelerator.backward(loss)
         optimizer.step()
 
-        if it % 100 == 0:
+        if it % 50 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
             print(train_loss_dict)
             print("-" * 80)
