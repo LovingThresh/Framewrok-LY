@@ -23,7 +23,10 @@ def pr(input, target):
     target = (target > 0.5).int()
     input = (input > 0.5).int()
 
-    tp = torch.sum(target * input)
+    input_maxpool = torch.nn.MaxPool2d(kernel_size=(5, 5), stride=(1, 1), padding=2).cuda()(
+        input.reshape(-1, 1, 512, 512).float())
+    input_maxpool = (input_maxpool.reshape((-1)) > 0.5).int()
+    tp = torch.sum(target * input_maxpool)
     pp = torch.sum(input)
 
     return (tp + torch.tensor(1e-8))  / (pp + torch.tensor(1e-8))
