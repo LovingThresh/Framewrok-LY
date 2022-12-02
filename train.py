@@ -104,8 +104,8 @@ def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None)
 
     output, target = output.reshape((-1)), target.reshape((-1))
     for eval_name, eval_function in eval_fn.items():
-        eval_value = eval_function(output.cpu(), target.cpu())
-        eval_value = eval_value.cuda()
+        eval_value = eval_function(output, target)
+        # eval_value = eval_value.cuda()
         eval_dict[eval_name].update(eval_value, output.size(0))
 
     return eval_dict

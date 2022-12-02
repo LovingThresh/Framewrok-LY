@@ -106,7 +106,7 @@ eval_function_iou = iou
 eval_function_pr = pr
 eval_function_re = re
 eval_function_f1 = f1
-eval_function_acc = torchmetrics.Accuracy()
+eval_function_acc = torchmetrics.Accuracy().cuda()
 
 loss_function = {'loss_seg': Asymmetry_Binary_Loss()}
 
