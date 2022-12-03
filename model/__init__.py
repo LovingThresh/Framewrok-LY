@@ -4,3 +4,5 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : __init__.py.py
 # @Software: PyCharm
+
+from model.model import get_norm_layer
