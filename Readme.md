@@ -14,7 +14,6 @@
 
 2、与初始化的模型类型有关
 
-
 ### 比较
 
 3、与去模糊模型的性能有关
@@ -23,26 +22,25 @@
 
 5、标签蒸馏算法与特征蒸馏算法
 
-
-
 首先设置清晰图像的分割训练超参基准
+
+
 
 确定Batch_Size、LearningRate、LeaeningRate Schedule、ImageAugmentation、ImageSize、Epochs
 
+
+目前跑了Batch_Size 为4、8 希望跑一下 2、16、32 的结果
+
+
+
 选择最好的作为基准
-
-
 
 然后讨论模糊模型
 
-
 选择ResNet，ConvNext，FPNInception，MobileNetv3
-
 
 讨论初始化
 
-
 讨论数据集
-
 
 讨论蒸馏算法
