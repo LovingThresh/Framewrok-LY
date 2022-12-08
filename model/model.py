@@ -171,12 +171,13 @@ class ResnetGenerator(nn.Module):
         if self.mode == 'image':
             output = self.model(input)
             output = nn.Tanh()(output)
+            output = input + output
         else:
             output = self.model(input)
             output = nn.Sigmoid()(output)
 
         if self.learn_residual:
-            # output = input + output
+            #
             output = torch.clamp(input + output, min=-1, max=1)
         return output
 

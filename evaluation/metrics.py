@@ -48,3 +48,8 @@ def f1(input, target):
     r = re(input, target)
 
     return 2 * p * r / (p + r + 1e-8)
+
+def correlation(input, target):
+    input_vector =  input.reshape((1, -1))
+    target_vector = target.reshape((1, -1))
+    return torch.corrcoef(torch.cat([input_vector, target_vector], dim=0))[0, 1]

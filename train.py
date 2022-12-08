@@ -29,11 +29,12 @@ std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3,
 
 
 class data_prefetcher:
-    def __init__(self, loader, mean, std):
+    def __init__(self, loader, Mean, Std, mode):
         self.next_input = None
         self.next_target = None
-        self.MEAN = mean
-        self.STD = std
+        self.MEAN = Mean
+        self.STD = Std
+        self.mode = mode
         self.num = len(loader)
         self.loader = iter(loader)
         self.stream = torch.cuda.Stream()
@@ -45,10 +46,12 @@ class data_prefetcher:
     def preload(self):
         try:
             self.next_input, self.next_target = next(self.loader)
+
         except StopIteration:
             self.next_input = None
             self.next_target = None
             return
+
         with torch.cuda.stream(self.stream):
             self.next_input = self.next_input.cuda(non_blocking=True)
             self.next_target = self.next_target.cuda(non_blocking=True)
@@ -58,7 +61,10 @@ class data_prefetcher:
             # else:
             self.next_input = self.next_input.float()
             self.next_input = self.next_input.sub_(self.mean).div_(self.std)
+
             self.next_target = self.next_target.float()
+            if self.mode == 'image':
+                self.next_target = self.next_target.sub_(self.mean).div_(self.std)
 
     def next(self):
         torch.cuda.current_stream().wait_stream(self.stream)
@@ -71,7 +77,7 @@ class data_prefetcher:
         return self.num
 
     def __getitem__(self, item):
-        it_batch = self.range[item]
+        _ = self.range[item]
         return self.next()
 
 
@@ -96,13 +102,22 @@ def eval_mode(output, target):
     return output[:, 1:, :, :], target[:, 1:, :, :].long()
 
 
-def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None):
+def eval_gan_mode(output, target):
+    return output.mul_(std).add_(mean), target.mul_(std).add_(mean)
+
+
+def calculate_eval(eval_fn, eval_dict: dict, output, target, mode='image'):
     assert isinstance(eval_fn, dict)
 
-    if mode_function is not None:
+    if mode == 'segmentation':
+        mode_function = eval_mode
+        output, target = mode_function(output, target)
+        output, target = output.reshape((-1)), target.reshape((-1))
+
+    elif mode == 'image':
+        mode_function = eval_gan_mode
         output, target = mode_function(output, target)
 
-    output, target = output.reshape((-1)), target.reshape((-1))
     for eval_name, eval_function in eval_fn.items():
         eval_value = eval_function(output, target)
         # eval_value = eval_value.cuda()
@@ -111,18 +126,18 @@ def calculate_eval(eval_fn, eval_dict: dict, output, target, mode_function=None)
     return eval_dict
 
 
-def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler, epoch, Epochs):
+def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler, epoch, Epochs, mode='image'):
     it = 0
     train_loss_dict = {}
     train_eval_dict = {}
-
+    output, target = None, None
     for loss_metric in loss_fn:
         train_loss_dict[loss_metric] = AverageMeter()
 
     for eval_metrics in eval_fn:
         train_eval_dict[eval_metrics] = AverageMeter()
 
-    train_load = data_prefetcher(train_load, MEAN, STD)
+    train_load = data_prefetcher(train_load, MEAN, STD, mode)
 
     for batch in train_load:
         it = it + 1
@@ -136,21 +151,22 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
         accelerator.backward(loss)
         optimizer.step()
 
-        if it % 50 == 0:
+        if it % 200 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
             print(train_loss_dict)
             print("-" * 80)
 
             with torch.no_grad():
                 train_eval_dict = \
-                    calculate_eval(eval_fn, train_eval_dict, output, target, mode_function=eval_mode)
+                    calculate_eval(eval_fn, train_eval_dict, output, target, mode=mode)
 
     scheduler.step()
 
     # evaluate the last batch
     with torch.no_grad():
         train_eval_dict = \
-            calculate_eval(eval_fn, train_eval_dict, output, target, mode_function=eval_mode)
+            calculate_eval(eval_fn, train_eval_dict, output, target, mode=mode)
+
     print("Epoch:{}/{}, Last Iter Evaluation:,".format(epoch, Epochs))
     print(train_eval_dict)
     print("-" * 80)
@@ -162,12 +178,14 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
                           loss_fn_generator, loss_fn_generator_extra, loss_fn_discriminator,
                           eval_fn_generator,
                           optimizer_generator, optimizer_discriminator,
-                          scheduler_generator, scheduler_discriminator, epoch, Epochs, Device='cuda'):
+                          scheduler_generator, scheduler_discriminator, epoch, Epochs, Device='cuda', mode='image'):
     it = 0
     train_loss_generator_dict = {}
     train_eval_generator_dict = {}
 
     train_loss_discriminator_dict = {}
+
+    input, fake_output, target = None, None, None
 
     for loss_metric in loss_fn_generator:
         train_loss_generator_dict[loss_metric] = AverageMeter()
@@ -182,6 +200,8 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
         train_eval_generator_dict[eval_metrics] = AverageMeter()
 
     D_weight = 0.5
+
+    train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
 
     for batch in train_load:
         it = it + 1
@@ -206,7 +226,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
         loss_dis_fake = loss_dis_fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
         loss_dis = loss_dis_real + loss_dis_fake
 
-        loss_dis.bacward()
+        loss_dis.backward()
         optimizer_discriminator.step()
         # ------------------------------------------------------------------------------------- #
 
@@ -215,7 +235,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
         # ------------------------------------------------------------------------------------- #
 
         optimizer_generator.zero_grad()
-        gen_predict = train_generator(fake_output)
+        gen_predict = train_discriminator(fake_output)
 
         # calculate generator loss
         loss_gen, train_loss_generator_dict = calculate_loss(loss_fn_generator, train_loss_generator_dict, gen_predict,
@@ -230,19 +250,25 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
         loss_gen_sum.backward()
         optimizer_generator.step()
 
-        if it % 50 == 0:
+        if it % 200 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
             print(train_loss_discriminator_dict)
             print(train_loss_generator_dict)
             print("-" * 80)
 
+            with torch.no_grad():
+                train_eval_generator_dict = \
+                    calculate_eval(eval_fn_generator, train_eval_generator_dict,
+                                   fake_output, target, mode=mode)
+
     scheduler_generator.step()
     scheduler_discriminator.step()
     # evaluate the last batch
-
     with torch.no_grad():
         train_eval_generator_dict = \
-            calculate_eval(eval_fn_generator, train_eval_generator_dict, fake_output, target, mode_function=eval_mode)
+            calculate_eval(eval_fn_generator, train_eval_generator_dict,
+                           fake_output, target, mode=mode)
+
     print("Epoch:{}/{}, Last Iter Evaluation:,".format(epoch, Epochs))
     print(train_eval_generator_dict)
     print("-" * 80)
@@ -250,7 +276,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
     return train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict
 
 
-def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
+def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mode='image'):
     it = 0
     validation_loss_dict = {}
     validation_eval_dict = {}
@@ -261,7 +287,8 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
     for eval_metrics in eval_fn:
         validation_eval_dict[eval_metrics] = AverageMeter()
 
-    eval_load = data_prefetcher(eval_load, MEAN, STD)
+    eval_load = data_prefetcher(eval_load, MEAN, STD, mode)
+
     for batch in eval_load:
         it = it + 1
 
@@ -270,7 +297,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs):
         loss, validation_loss_dict = \
             calculate_loss(loss_fn, validation_loss_dict, output, target)
         validation_eval_dict = \
-            calculate_eval(eval_fn, validation_eval_dict, output, target, mode_function=eval_mode)
+            calculate_eval(eval_fn, validation_eval_dict, output, target, mode=mode)
 
         if it % 50 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(eval_load)))
@@ -296,19 +323,19 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             train_model.train()
             train_loss_dict, train_eval_dict = train_epoch(train_model, train_load, loss_fn, eval_fn,
-                                                           optimizer, scheduler, epoch, epochs)
+                                                           optimizer, scheduler, epoch, epochs, mode=mode)
             with torch.no_grad():
                 validation_loss_dict, validation_eval_dict = validation_epoch(train_model, val_load, loss_fn, eval_fn,
-                                                                              epoch, epochs)
+                                                                              epoch, epochs, mode=mode)
             train_loss_dict, train_eval_dict, \
-            validation_loss_dict, validation_eval_dict = Metrics2Value(train_loss_dict), \
-                                                         Metrics2Value(train_eval_dict), \
-                                                         Metrics2Value(validation_loss_dict), \
-                                                         Metrics2Value(validation_eval_dict)
+                validation_loss_dict, validation_eval_dict = Metrics2Value(train_loss_dict), \
+                Metrics2Value(train_eval_dict), \
+                Metrics2Value(validation_loss_dict), \
+                Metrics2Value(validation_eval_dict)
 
             train_dict, validation_dict = {'loss': train_loss_dict, 'eval': train_eval_dict,
                                            'lr': {'lr': optimizer.state_dict()['param_groups'][0]['lr']}}, \
-                                          {'loss': validation_loss_dict, 'eval': validation_eval_dict}
+                {'loss': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
             if B_comet:
@@ -326,7 +353,7 @@ def train(train_model, optimizer, loss_fn, eval_fn,
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')
-            val_loader = data_prefetcher(val_load, MEAN, STD)
+            val_loader = data_prefetcher(val_load, MEAN, STD, mode=mode)
             visualize_save_pair(train_model, val_loader, mean, std, save_path, epoch, mode=mode)
 
             if (epoch % 100) == 0:
@@ -338,6 +365,88 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                     "eval_fn": eval_fn,
                     "lr_schedule_state_dict": scheduler.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict()
+                }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
+
+    train_process(comet, experiment)
+
+
+def train_gen_dis(train_model_G, train_model_D,
+                  optimizer_G, optimizer_D,
+                  loss_fn_generator, loss_gan_g, loss_gan_d,
+                  eval_fn_generator,
+                  train_load, val_load, epochs,
+                  scheduler_generator, scheduler_discriminator,
+                  threshold, output_dir, train_writer_summary, valid_writer_summary,
+                  experiment, comet=False, init_epoch=1, mode=None):
+    train_model_G, train_model_D, optimizer_G, optimizer_D, \
+        scheduler_generator, scheduler_discriminator, train_load, val_load = \
+        accelerator.prepare(train_model_G, train_model_D, optimizer_G, optimizer_D,
+                            scheduler_generator, scheduler_discriminator, train_load, val_load)
+
+    def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
+        for epoch in range(init_epoch_num, epochs + init_epoch_num):
+
+            print(f'Epoch {epoch}/{epochs}')
+            print('-' * 10)
+
+            train_model_G.train()
+
+            train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict = \
+                train_generator_epoch(train_model_G, train_model_D, train_load, loss_gan_g, loss_fn_generator, loss_gan_d,
+                                      eval_fn_generator, optimizer_G, optimizer_D, scheduler_generator, scheduler_discriminator,
+                                      epoch, epochs, mode=mode)
+            with torch.no_grad():
+                validation_loss_dict, validation_eval_dict = validation_epoch(train_model_G, val_load, loss_fn_generator, eval_fn_generator,
+                                                                              epoch, epochs, mode=mode)
+            train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict, \
+                validation_loss_dict, validation_eval_dict = Metrics2Value(train_loss_generator_dict), \
+                Metrics2Value(train_loss_discriminator_dict), \
+                Metrics2Value(train_eval_generator_dict), \
+                Metrics2Value(validation_loss_dict), \
+                Metrics2Value(validation_eval_dict)
+
+            train_dict, validation_dict = {'loss_g': train_loss_generator_dict,
+                                           'loss_d': train_loss_discriminator_dict,
+                                           'eval': train_eval_generator_dict,
+                                           'lr': {'lr_g': optimizer_G.state_dict()['param_groups'][0]['lr'],
+                                                  'lr_d': optimizer_D.state_dict()['param_groups'][0]['lr']}}, \
+                {'loss': validation_loss_dict, 'eval': validation_eval_dict}
+            write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
+
+            if B_comet:
+                experiment_comet.log(
+                    {'train/': train_dict, 'valid/': validation_dict,
+                     'lr': {'lr_g': optimizer_G.state_dict()['param_groups'][0]['lr'],
+                            'lr_d': optimizer_D.state_dict()['param_groups'][0]['lr']}})
+
+            # 这一部分可以根据任务进行调整
+            metric = sorted(validation_eval_dict.items())[2][0]
+
+            if validation_eval_dict[metric] > threshold_value:
+                torch.save(train_model_G.state_dict(),
+                           os.path.join(output_dir, 'save_model',
+                                        'Epoch_{}_eval_{}.pt'.format(epoch, validation_eval_dict[metric])))
+                threshold_value = validation_eval_dict['eval_iou']
+
+            # 验证阶段的结果可视化
+            save_path = os.path.join(output_dir, 'save_fig')
+            val_loader = data_prefetcher(val_load, MEAN, STD, mode=mode)
+            visualize_save_pair(train_model_G, val_loader, mean, std, save_path, epoch, mode=mode)
+
+            if (epoch % 100) == 0:
+                save_checkpoint_path = os.path.join(output_dir, 'checkpoint')
+                torch.save({
+                    "epoch": epoch,
+                    "model_g_state_dict": train_model_G.state_dict(),
+                    "model_d_state_dict": train_model_D.state_dict(),
+                    "loss_fn_generator": loss_fn_generator,
+                    "loss_gn_gan_g": loss_gan_g,
+                    "loss_fn_gan_d": loss_gan_d,
+                    "eval_fn_generator": eval_fn_generator,
+                    "lr_schedule_g_state_dict": scheduler_generator.state_dict(),
+                    "lr_schedule_d_state_dict": scheduler_discriminator.state_dict(),
+                    "optimizer_g_state_dict": optimizer_G.state_dict(),
+                    "optimizer_d_state_dict": optimizer_D.state_dict(),
                 }, os.path.join(save_checkpoint_path, str(epoch) + '.pth'))
 
     train_process(comet, experiment)

@@ -24,14 +24,9 @@
 
 首先设置清晰图像的分割训练超参基准
 
-
-
 确定Batch_Size、LearningRate、LeaeningRate Schedule、ImageAugmentation、ImageSize、Epochs
 
-
 目前跑了Batch_Size 为4、8 希望跑一下 2、16、32 的结果
-
-
 
 选择最好的作为基准
 

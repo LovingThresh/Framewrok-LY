@@ -8,6 +8,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
 # Binary Weight MSE
 # FocalLOSS
 #
@@ -112,7 +113,7 @@ class FocalLoss(nn.Module):
         self.size_average = size_average
         self.ce_fn = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index)
 
-    def _aux_forward(self, *inputs, **kwargs):
+    def _aux_forward(self, *inputs):
         *preds, target = tuple(inputs)
 
         loss = self._base_forward(preds[0], target)
@@ -144,7 +145,7 @@ class FocalLoss(nn.Module):
         else:
             return loss.sum()
 
-    def forward(self, *inputs, **kwargs):
+    def forward(self, *inputs):
         preds, target = tuple(inputs)
         inputs = tuple(list(preds) + [target])
         return self._aux_forward(*inputs)
@@ -177,7 +178,7 @@ class LovaszSoftmax(nn.Module):
         if input.dim() == 4:
             input = input.permute(0, 2, 3, 1).contiguous()
             input_flatten = input.view(-1, num_class)
-        elif input.dim() == 5:
+        else:
             input = input.permute(0, 2, 3, 4, 1).contiguous()
             input_flatten = input.view(-1, num_class)
         target_flatten = target.view(-1)
@@ -226,3 +227,43 @@ class Asymmetry_Binary_Loss(nn.Module):
         mse = torch.nn.MSELoss()
 
         return mse(y_true_0, y_pred_0) + mse(y_true_1, y_pred_1)
+
+
+class ContentLoss:
+    def __init__(self, loss):
+        self.criterion = loss
+
+    def get_loss(self, fakeIm, realIm):
+        return self.criterion(fakeIm, realIm)
+
+
+def contentFunc():
+    conv_3_3_layer = 14
+    cnn = models.vgg19(pretrained=True).features
+    cnn = cnn.cuda()
+    model = nn.Sequential()
+    model = model.cuda()
+    for i, layer in enumerate(list(cnn)):
+        model.add_module(str(i), layer)
+        if i == conv_3_3_layer:
+            break
+    return model
+
+
+class PerceptualLoss:
+
+    def __init__(self, loss):
+        self.criterion = loss
+        self.contentFunc = contentFunc()
+
+    def get_loss(self, fakeIm, realIm):
+        f_fake = self.contentFunc.forward(fakeIm)
+        f_real = self.contentFunc.forward(realIm)
+        f_real_no_grad = f_real.detach()
+        loss = self.criterion(f_fake, f_real_no_grad)
+        return loss
+
+
+def perceptual_loss(input, target):
+    P = PerceptualLoss(nn.MSELoss())
+    return 100 * P.get_loss(input, target)
