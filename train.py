@@ -13,7 +13,7 @@ from logger.metrics import AverageMeter
 from logger.tensorboard import write_summary
 from utils.visualize import visualize_save_pair
 
-accelerator = Accelerator()
+accelerator = Accelerator(mixed_precision="fp16")
 device = accelerator.device
 
 # UAV_image
@@ -226,7 +226,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
         loss_dis_fake = loss_dis_fake * torch.tensor(D_weight, dtype=torch.float32, device=Device)
         loss_dis = loss_dis_real + loss_dis_fake
 
-        loss_dis.backward()
+        accelerator.backward(loss_dis)
         optimizer_discriminator.step()
         # ------------------------------------------------------------------------------------- #
 
@@ -247,7 +247,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
                                                                    fake_output, target)
 
         loss_gen_sum = loss_gen + loss_gen_extra
-        loss_gen_sum.backward()
+        accelerator.backward(loss_gen_sum)
         optimizer_generator.step()
 
         if it % 200 == 0:
