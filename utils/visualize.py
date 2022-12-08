@@ -95,13 +95,14 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
 
     if mode == 'image':
         output_tensor_numpy = output_tensor_numpy.reshape(output_tensor_numpy.shape[1], output_tensor_numpy.shape[2], 3)
+        output_tensor_numpy = np.uint8(output_tensor_numpy)
         output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_BGR2RGB)
-
+        cv2.imwrite('{}/{}_output.jpg'.format(save_path, epoch + num), output_tensor_numpy)
     else:
         output_tensor_numpy = output_tensor_numpy.reshape(output_tensor_numpy.shape[1], output_tensor_numpy.shape[2], 2)
         output_tensor_numpy = output_tensor_numpy[:, :, 1]
 
-    cv2.imwrite('{}/{}_output.jpg'.format(save_path, epoch + num), np.uint8(output_tensor_numpy * 255))
+        cv2.imwrite('{}/{}_output.jpg'.format(save_path, epoch + num), np.uint8(output_tensor_numpy * 255))
 
     val_model.train(True)
     with torch.no_grad():
@@ -115,7 +116,7 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
     predict_tensor_numpy = predict_tensor_numpy.reshape(predict_tensor_numpy.shape[1], predict_tensor_numpy.shape[2], 3)
 
     if mode == 'image':
-        predict_tensor_numpy = torch.tensor(predict_tensor_numpy).mul_(std).add_(mean).numpy()
+        predict_tensor_numpy = predict_tensor_numpy * std.reshape(1, 1, 3).cpu().numpy() + mean.reshape(1, 1, 3).cpu().numpy()
         predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_BGR2RGB)
     else:
         predict_tensor_numpy = predict_tensor_numpy * 255

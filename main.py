@@ -40,19 +40,19 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 hyper_params = {
-    "mode": 'image',
+    "mode": 'segmentation',
     "ex_number": '3090_Segmentation_EarthQuake',
     "raw_size": (3, 512, 512),
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
     "batch_size": 4,
     "learning_rate": 4e-3,
-    "epochs": 200,
+    "epochs": 5,
     "threshold": 24,
-    "checkpoint": False,
+    "checkpoint": True,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": r''
+    "check_path": 'E:/BJM/Motion_Image/2022-12-03-00-08-56.875391/save_model/Epoch_161_eval_0.8446345925331116.pt'
 }
 
 experiment = object
@@ -109,15 +109,17 @@ if mode == 'segmentation':
 
     train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 
+    eval_function_mean_iou = torchmetrics.JaccardIndex(num_classes=2).cuda()
     eval_function_iou = iou
     eval_function_pr = pr
     eval_function_re = re
     eval_function_f1 = f1
-    eval_function_acc = torchmetrics.Accuracy().cuda()
+    eval_function_acc = torchmetrics.Accuracy(subset_accuracy=True).cuda()
 
     loss_function = {'loss_seg': Asymmetry_Binary_Loss()}
 
     eval_function = {'eval_iou': eval_function_iou,
+                     'eval_iou_mean': eval_function_mean_iou,
                      'eval_pr': eval_function_pr,
                      'eval_re': eval_function_re,
                      'eval_f1': eval_function_f1,

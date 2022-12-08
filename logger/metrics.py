@@ -9,6 +9,7 @@ import torch
 
 class AverageMeter:
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.count = None
         self.sum = None
@@ -23,10 +24,11 @@ class AverageMeter:
         self.count = torch.tensor(0, device='cuda', dtype=torch.float32)
 
     def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+        with torch.no_grad():
+            self.val = val
+            self.sum += val * n
+            self.count += n
+            self.avg = self.sum / self.count
 
     def __repr__(self):
         return '[val: ' + str(round(self.val.item(), 4)) + '][' + 'avg: ' + str(round(self.avg.item(), 4)) + ']'
