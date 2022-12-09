@@ -7,6 +7,8 @@
 import math
 import shutil
 
+import torch
+
 from logger import wandb
 from logger.copy import copy_and_upload
 
@@ -34,8 +36,9 @@ train_comet = False
 random.seed(24)
 np.random.seed(24)
 torch.manual_seed(24)
+torch.cuda.manual_seed(24)
 torch.cuda.manual_seed_all(24)
-
+os.environ['PYTHONASHSEED'] = str(24)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
@@ -47,9 +50,9 @@ hyper_params = {
     "input_size": (3, 512, 512),
     "batch_size": 4,
     "learning_rate": 4e-3,
-    "epochs": 5,
-    "threshold": 24,
-    "checkpoint": True,
+    "epochs": 200,
+    "threshold": 0.6,
+    "checkpoint": False,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
     "check_path": 'E:/BJM/Motion_Image/2022-12-03-00-08-56.875391/save_model/Epoch_161_eval_0.8446345925331116.pt'
@@ -107,14 +110,14 @@ output_dir, timestamp = None, None
 if mode == 'segmentation':
     generator = define_G(3, 2, 64, 'resnet_9blocks', learn_residual=False, norm='instance', mode=mode)
 
-    train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
+    train_loader, val_loader, test_loader = get_BlurImage_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 
     eval_function_mean_iou = torchmetrics.JaccardIndex(num_classes=2).cuda()
     eval_function_iou = iou
     eval_function_pr = pr
     eval_function_re = re
     eval_function_f1 = f1
-    eval_function_acc = torchmetrics.Accuracy(subset_accuracy=True).cuda()
+    eval_function_acc = torchmetrics.Accuracy().cuda()
 
     loss_function = {'loss_seg': Asymmetry_Binary_Loss()}
 

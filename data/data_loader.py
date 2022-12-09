@@ -129,6 +129,34 @@ def get_Image_Mask_Dataset(re_size, batch_size):
     return Train_loader, Val_loader, Test_loader
 
 
+def get_BlurImage_Mask_Dataset(re_size, batch_size):
+    train_dataset = Custom_Dataset(raw_image_path=raw_train_blur_dir,
+                                   raw_mask_path=raw_train_mask_dir,
+                                   size=re_size,
+                                   data_txt=train_data_txt,
+                                   transformer=train_transform)
+
+    val_dataset = Custom_Dataset(raw_image_path=raw_val_blur_dir,
+                                 raw_mask_path=raw_val_mask_dir,
+                                 size=re_size,
+                                 data_txt=val_data_txt,
+                                 transformer=val_transform)
+
+    test_dataset = Custom_Dataset(raw_image_path=raw_test_blur_dir,
+                                  raw_mask_path=raw_test_mask_dir,
+                                  size=re_size,
+                                  data_txt=test_data_txt,
+                                  transformer=val_transform)
+
+    # when using weightedRandomSampler, it is already balanced random, so DO NOT shuffle again
+
+    Train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    Val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+    Test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
+
+    return Train_loader, Val_loader, Test_loader
+
+
 def get_BlueImage_Image_Dataset(re_size, batch_size):
     train_dataset = Custom_BlurImage_Dataset(raw_image_path=raw_train_dir,
                                              raw_blur_path=raw_train_blur_dir,
