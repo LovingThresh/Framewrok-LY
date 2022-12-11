@@ -84,13 +84,12 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
     input_tensor_numpy = np.uint8(input_tensor_numpy)
     input_tensor_numpy = cv2.cvtColor(input_tensor_numpy, cv2.COLOR_RGB2BGR)
 
+    cv2.imwrite('{}/{}_input.jpg'.format(save_path, epoch + num), input_tensor_numpy)
+
     if mode == 'image':
         output_tensor_numpy = a[1][0 + i:1 + i].mul_(std).add_(mean).cpu().numpy()
     else:
         output_tensor_numpy = a[1][0 + i:1 + i].cpu().numpy()
-
-    cv2.imwrite('{}/{}_input.jpg'.format(save_path, epoch + num), input_tensor_numpy)
-
     output_tensor_numpy = output_tensor_numpy.transpose(0, 2, 3, 1)
 
     if mode == 'image':
@@ -107,18 +106,20 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
     val_model.train(True)
     with torch.no_grad():
         predict_tensor = val_model(a[0][0 + i: 1 + i])
-    predict_tensor_numpy = predict_tensor.detach().cpu().numpy()
+    if mode == 'image':
+        predict_tensor_numpy = predict_tensor.detach().mul_(std).add_(mean).cpu().numpy()
+    else:
+        predict_tensor_numpy = predict_tensor.detach().cpu().numpy()
     predict_tensor_numpy = predict_tensor_numpy.transpose(0, 2, 3, 1)
 
-    if predict_tensor_numpy.shape[-1] == 2:
-        predict_tensor_numpy = predict_tensor_numpy[:, :, :, 1:].repeat(3, axis=-1)
-
-    predict_tensor_numpy = predict_tensor_numpy.reshape(predict_tensor_numpy.shape[1], predict_tensor_numpy.shape[2], 3)
-
     if mode == 'image':
-        predict_tensor_numpy = predict_tensor_numpy * std.reshape(1, 1, 3).cpu().numpy() + mean.reshape(1, 1, 3).cpu().numpy()
+        predict_tensor_numpy = predict_tensor_numpy.reshape(predict_tensor_numpy.shape[1],
+                                                            predict_tensor_numpy.shape[2], 3)
+        predict_tensor_numpy = np.uint8(predict_tensor_numpy)
         predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_RGB2BGR)
     else:
+        if predict_tensor_numpy.shape[-1] == 2:
+            predict_tensor_numpy = predict_tensor_numpy[:, :, :, 1:].repeat(3, axis=-1)
         predict_tensor_numpy = predict_tensor_numpy * 255
 
     cv2.imwrite('{}/{}_predict.jpg'.format(save_path, epoch + num), np.uint8(predict_tensor_numpy))
