@@ -443,7 +443,8 @@ def train_gen_dis(train_model_G, train_model_D,
 
             # 验证阶段的结果可视化
             save_path = os.path.join(output_dir, 'save_fig')
-            val_loader = data_prefetcher(val_load, MEAN, STD, mode=mode)
+            # val_loader = data_prefetcher(val_load, MEAN, STD, mode=mode)
+            val_loader = val_load
             visualize_save_pair(train_model_G, val_loader, mean, std, save_path, epoch, mode=mode)
 
             if (epoch % 100) == 0:

@@ -98,10 +98,10 @@ class Custom_BlurImage_Dataset(Dataset):
 
         self.transformed = self.transform(image=self.blur_image, mask=self.raw_image)
         self.blur_image, self.raw_image = self.transformed['image'], self.transformed['mask']
-
+        self.blur_image, self.raw_image = self.blur_image / 255., self.raw_image / 255.
         self.blur_image, self.raw_image = \
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.blur_image.float()), \
-                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.raw_image.float())
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.blur_image), \
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.raw_image)
 
         return self.blur_image, self.raw_image
 
