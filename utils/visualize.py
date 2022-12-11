@@ -117,7 +117,7 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
 
     if mode == 'image':
         predict_tensor_numpy = predict_tensor_numpy * std.reshape(1, 1, 3).cpu().numpy() + mean.reshape(1, 1, 3).cpu().numpy()
-        predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_BGR2RGB)
+        predict_tensor_numpy = cv2.cvtColor(predict_tensor_numpy, cv2.COLOR_RGB2BGR)
     else:
         predict_tensor_numpy = predict_tensor_numpy * 255
 

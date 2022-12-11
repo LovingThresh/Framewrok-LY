@@ -43,19 +43,19 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 hyper_params = {
-    "mode": 'segmentation',
+    "mode": 'image',
     "ex_number": '3090_Segmentation_EarthQuake',
     "raw_size": (3, 512, 512),
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
     "batch_size": 4,
-    "learning_rate": 4e-3,
+    "learning_rate": 1e-4,
     "epochs": 200,
-    "threshold": 0.6,
-    "checkpoint": False,
+    "threshold": 20,
+    "checkpoint": True,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": 'E:/BJM/Motion_Image/2022-12-03-00-08-56.875391/save_model/Epoch_161_eval_0.8446345925331116.pt'
+    "check_path": 'O:/Project/Motion_Image_Enhancement/New_earthquake_crack_init_model.pt'
 }
 
 experiment = object
@@ -165,7 +165,7 @@ elif mode == 'image':
 
     train_loader, val_loader, test_loader = get_BlueImage_Image_Dataset(re_size=raw_size, batch_size=batch_size)
 
-    generator = define_G(3, 3, 64, 'resnet_9blocks', learn_residual=False, norm='instance', mode=mode)
+    generator = define_G(3, 3, 64, 'resnet_9blocks', learn_residual=True, norm='instance', mode=mode)
     discriminator = define_D(3, 64, 'basic', use_sigmoid=True, norm='instance')
 
     eval_function_acc = torchmetrics.Accuracy().cuda()
