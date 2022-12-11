@@ -177,8 +177,8 @@ class ResnetGenerator(nn.Module):
             output = nn.Sigmoid()(output)
 
         if self.learn_residual:
-            output = input + output
-            # output = torch.clamp(input + output, min=-1, max=1)
+            # output = input + output
+            output = torch.clamp(input + output, min=-1, max=1)
         return output
 
 

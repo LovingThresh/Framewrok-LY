@@ -8,6 +8,7 @@ import os
 import cv2
 import numpy as np
 import albumentations as A
+from torchvision import transforms
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -98,6 +99,10 @@ class Custom_BlurImage_Dataset(Dataset):
         self.transformed = self.transform(image=self.blur_image, mask=self.raw_image)
         self.blur_image, self.raw_image = self.transformed['image'], self.transformed['mask']
 
+        self.blur_image, self.raw_image = \
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.blur_image.float()), \
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(self.raw_image.float())
+
         return self.blur_image, self.raw_image
 
 
@@ -157,7 +162,7 @@ def get_BlurImage_Mask_Dataset(re_size, batch_size):
     return Train_loader, Val_loader, Test_loader
 
 
-def get_BlueImage_Image_Dataset(re_size, batch_size):
+def get_BlurImage_Image_Dataset(re_size, batch_size):
     train_dataset = Custom_BlurImage_Dataset(raw_image_path=raw_train_dir,
                                              raw_blur_path=raw_train_blur_dir,
                                              size=re_size,

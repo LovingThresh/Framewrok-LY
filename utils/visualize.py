@@ -96,7 +96,7 @@ def visualize_save_pair(val_model: torch.nn.Module, val_loader, mean, std, save_
     if mode == 'image':
         output_tensor_numpy = output_tensor_numpy.reshape(output_tensor_numpy.shape[1], output_tensor_numpy.shape[2], 3)
         output_tensor_numpy = np.uint8(output_tensor_numpy)
-        output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_BGR2RGB)
+        output_tensor_numpy = cv2.cvtColor(output_tensor_numpy, cv2.COLOR_RGB2BGR)
         cv2.imwrite('{}/{}_output.jpg'.format(save_path, epoch + num), output_tensor_numpy)
     else:
         output_tensor_numpy = output_tensor_numpy.reshape(output_tensor_numpy.shape[1], output_tensor_numpy.shape[2], 2)

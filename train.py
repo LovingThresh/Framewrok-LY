@@ -21,8 +21,12 @@ device = accelerator.device
 # STD = [0.134, 0.122, 0.111]
 
 # earthquake_crack
-MEAN = [0.311, 0.307, 0.307]
-STD = [0.165, 0.155, 0.143]
+# MEAN = [0.311, 0.307, 0.307]
+# STD = [0.165, 0.155, 0.143]
+
+# Normalize_crack
+MEAN = [0.5, 0.5, 0.5]
+STD = [0.5, 0.5, 0.5]
 
 mean = torch.tensor([MEAN[0] * 255, MEAN[1] * 255, MEAN[2] * 255]).cuda().view(1, 3, 1, 1)
 std = torch.tensor([STD[0] * 255, STD[1] * 255, STD[2] * 255]).cuda().view(1, 3, 1, 1)
@@ -201,7 +205,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
 
     D_weight = torch.tensor(0.5, dtype=torch.float32, device=Device)
     real_label, fake_label, gen_label = None, None, None
-    train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
+    # train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
 
     for batch in train_load:
         it = it + 1
@@ -293,7 +297,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mod
     for eval_metrics in eval_fn:
         validation_eval_dict[eval_metrics] = AverageMeter()
 
-    eval_load = data_prefetcher(eval_load, MEAN, STD, mode)
+    # eval_load = data_prefetcher(eval_load, MEAN, STD, mode)
 
     for batch in eval_load:
         it = it + 1

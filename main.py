@@ -52,7 +52,7 @@ hyper_params = {
     "learning_rate": 1e-4,
     "epochs": 200,
     "threshold": 20,
-    "checkpoint": True,
+    "checkpoint": False,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
     "check_path": 'O:/Project/Motion_Image_Enhancement/New_earthquake_crack_init_model.pt'
@@ -163,7 +163,7 @@ if mode == 'segmentation':
 
 elif mode == 'image':
 
-    train_loader, val_loader, test_loader = get_BlueImage_Image_Dataset(re_size=raw_size, batch_size=batch_size)
+    train_loader, val_loader, test_loader = get_BlurImage_Image_Dataset(re_size=raw_size, batch_size=batch_size)
 
     generator = define_G(3, 3, 64, 'resnet_9blocks', learn_residual=True, norm='instance', mode=mode)
     discriminator = define_D(3, 64, 'basic', use_sigmoid=True, norm='instance')
