@@ -7,8 +7,6 @@
 import math
 import shutil
 
-import torch
-
 from logger import wandb
 from logger.copy import copy_and_upload
 
@@ -49,8 +47,8 @@ hyper_params = {
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
     "batch_size": 4,
-    "learning_rate": 1e-4,
-    "epochs": 200,
+    "learning_rate": 2e-4,
+    "epochs": 50,
     "threshold": 20,
     "checkpoint": False,
     "Img_Recon": True,

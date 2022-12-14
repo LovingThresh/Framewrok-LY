@@ -29,6 +29,7 @@ def copy_and_upload(hyper_params, src_path):
     shutil.copytree('utils', '{}/{}'.format(output_dir, 'utils'))
     shutil.copytree('model', '{}/{}'.format(output_dir, 'model'))
     shutil.copytree('logger', '{}/{}'.format(output_dir, 'logger'))
+    shutil.copytree('evaluation', '{}/{}'.format(output_dir, 'evaluation'))
     shutil.copytree('deployment', '{}/{}'.format(output_dir, 'deployment'))
 
     # 个人热代码

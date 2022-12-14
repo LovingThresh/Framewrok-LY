@@ -124,7 +124,6 @@ def calculate_eval(eval_fn, eval_dict: dict, output, target, mode='image'):
 
     for eval_name, eval_function in eval_fn.items():
         eval_value = eval_function(output, target)
-        # eval_value = eval_value.cuda()
         eval_dict[eval_name].update(eval_value, output.size(0))
 
     return eval_dict
@@ -152,7 +151,7 @@ def train_epoch(train_model, train_load, loss_fn, eval_fn, optimizer, scheduler,
         output = train_model(inputs)
         loss, train_loss_dict = \
             calculate_loss(loss_fn, train_loss_dict, output, target)
-        accelerator.backward(loss)
+        loss.backward()
         optimizer.step()
 
         if it % 200 == 0:
@@ -184,18 +183,17 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
                           optimizer_generator, optimizer_discriminator,
                           scheduler_generator, scheduler_discriminator, epoch, Epochs, Device='cuda', mode='image'):
     it = 0
+    train_loss_generator_extra_dict = {}
     train_loss_generator_dict = {}
     train_eval_generator_dict = {}
 
     train_loss_discriminator_dict = {}
 
-    input, fake_output, target = None, None, None
-
     for loss_metric in loss_fn_generator:
         train_loss_generator_dict[loss_metric] = AverageMeter()
 
     for loss_metric in loss_fn_generator_extra:
-        train_loss_generator_dict[loss_metric] = AverageMeter()
+        train_loss_generator_extra_dict[loss_metric] = AverageMeter()
 
     for loss_metric in loss_fn_discriminator:
         train_loss_discriminator_dict[loss_metric] = AverageMeter()
@@ -203,63 +201,61 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
     for eval_metrics in eval_fn_generator:
         train_eval_generator_dict[eval_metrics] = AverageMeter()
 
-    D_weight = torch.tensor(0.5, dtype=torch.float32, device=Device)
-    real_label, fake_label, gen_label = None, None, None
+    D_weight = torch.tensor(0.5, dtype=torch.float32, device=Device, requires_grad=True)
+    fake_gen_output, target = None, None
     # train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
 
     for batch in train_load:
         it = it + 1
 
-        optimizer_discriminator.zero_grad()
-        inputs, target = batch
+        input, target = batch
         # ------------------------------------------------------------------------------------- #
-
-        real_predict = train_discriminator(target)
-        if it == 1:
-            real_label = torch.ones(real_predict.shape, dtype=torch.float32, device=Device)
-
-        loss_dis_real, train_loss_discriminator_dict = \
-            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict, real_predict, real_label)
-
+        #                               optimize generator                                      #
         # ------------------------------------------------------------------------------------- #
-
-        fake_output = train_generator(inputs)
-        fake_predict = train_discriminator(fake_output.detach().clone())
-        if it == 1:
-            fake_label = torch.zeros(fake_predict.shape, dtype=torch.float32, device=Device)
-
-        loss_dis_fake, train_loss_discriminator_dict = \
-            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict, fake_predict, fake_label)
-
-        loss_dis_real = loss_dis_real * D_weight
-        loss_dis_fake = loss_dis_fake * D_weight
-        loss_dis = loss_dis_real + loss_dis_fake
-
-        accelerator.backward(loss_dis)
-        optimizer_discriminator.step()
-        # ------------------------------------------------------------------------------------- #
-
-        # ------------------------------------------------------------------------------------- #
-        #                                   Generator Training                                  #
-        # ------------------------------------------------------------------------------------- #
+        for p in train_discriminator.parameters():
+            p.requires_grad = False
 
         optimizer_generator.zero_grad()
-        gen_predict = train_discriminator(fake_output)
+        fake_gen_output = train_generator(input)
+        # loss_fn_generator_extra includes pixel loss and perceptual loss
+        loss_gen_extra, train_loss_generator_extra_dict = \
+            calculate_loss(loss_fn_generator_extra, train_loss_generator_extra_dict, fake_gen_output, target)
 
-        if it == 1:
-            gen_label = torch.ones(gen_predict.shape, dtype=torch.float32, device=Device)
-        # calculate generator loss
-        loss_gen, train_loss_generator_dict = calculate_loss(loss_fn_generator, train_loss_generator_dict, gen_predict,
-                                                             gen_label)
+        # gan generator loss
+        fake_gen_pred = train_discriminator(fake_gen_output)
+        loss_gen_real, train_loss_generator_dict = \
+            calculate_loss(loss_fn_generator, train_loss_generator_dict,
+                           fake_gen_pred, torch.ones(fake_gen_pred.shape, dtype=torch.float32, device=Device))
 
-        # calculate generator loss extra
-        loss_gen_extra, train_loss_generator_dict = calculate_loss(loss_fn_generator_extra, train_loss_generator_dict,
-                                                                   fake_output, target)
-
-        loss_gen_sum = loss_gen + loss_gen_extra
-        accelerator.backward(loss_gen_sum)
+        loss_gen_total = loss_gen_extra + loss_gen_real
+        loss_gen_total.backward()
         optimizer_generator.step()
 
+        # ------------------------------------------------------------------------------------- #
+        #                            optimize discriminator                                     #
+        # ------------------------------------------------------------------------------------- #
+        for p in train_discriminator.parameters():
+            p.requires_grad = True
+
+        optimizer_discriminator.zero_grad()
+        # real loss
+        real_dis_pred = train_discriminator(target)
+        loss_dis_real, train_loss_discriminator_dict = \
+            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict,
+                           real_dis_pred, torch.ones(real_dis_pred.shape, dtype=torch.float32, device=Device))
+
+        # fake loss
+        fake_dis_pred = train_discriminator(fake_gen_output.detach())
+        loss_dis_fake, train_loss_discriminator_dict = \
+            calculate_loss(loss_fn_discriminator, train_loss_discriminator_dict,
+                           fake_dis_pred, torch.zeros(fake_dis_pred.shape, dtype=torch.float32, device=Device))
+        loss_dis_total = D_weight * (loss_dis_real + loss_dis_fake)
+        loss_dis_total.backward()
+        optimizer_discriminator.step()
+
+        # ------------------------------------------------------------------------------------- #
+        #                             training status indicator                                 #
+        # ------------------------------------------------------------------------------------- #
         if it % 200 == 0:
             print("Epoch:{}/{}, Iter:{}/{},".format(epoch, Epochs, it, len(train_load)))
             print(train_loss_discriminator_dict)
@@ -269,21 +265,23 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
             with torch.no_grad():
                 train_eval_generator_dict = \
                     calculate_eval(eval_fn_generator, train_eval_generator_dict,
-                                   fake_output, target, mode=mode)
+                                   fake_gen_output, target, mode=mode)
 
     scheduler_generator.step()
     scheduler_discriminator.step()
+
     # evaluate the last batch
     with torch.no_grad():
         train_eval_generator_dict = \
             calculate_eval(eval_fn_generator, train_eval_generator_dict,
-                           fake_output, target, mode=mode)
+                           fake_gen_output, target, mode=mode)
 
     print("Epoch:{}/{}, Last Iter Evaluation:,".format(epoch, Epochs))
     print(train_eval_generator_dict)
     print("-" * 80)
 
-    return train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict
+    return train_loss_generator_dict, train_loss_generator_extra_dict, \
+        train_loss_discriminator_dict, train_eval_generator_dict
 
 
 def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mode='image'):
@@ -297,7 +295,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mod
     for eval_metrics in eval_fn:
         validation_eval_dict[eval_metrics] = AverageMeter()
 
-    # eval_load = data_prefetcher(eval_load, MEAN, STD, mode)
+    eval_load = data_prefetcher(eval_load, MEAN, STD, mode)
 
     for batch in eval_load:
         it = it + 1
@@ -321,11 +319,12 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mod
 def train(train_model, optimizer, loss_fn, eval_fn,
           train_load, val_load, epochs, scheduler,
           threshold, output_dir, train_writer_summary, valid_writer_summary,
-          experiment, comet=False, init_epoch=1, mode=None):
+          experiment, comet=False, init_epoch=1, mode=None, metrix_number=2):
     train_model, optimizer, scheduler, train_load, val_load = accelerator.prepare(train_model, optimizer, scheduler,
                                                                                   train_load, val_load)
 
-    def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
+    def train_process(B_comet, experiment_comet, threshold_value=threshold,
+                      init_epoch_num=init_epoch, save_number=metrix_number):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
 
             print(f'Epoch {epoch}/{epochs}')
@@ -348,12 +347,8 @@ def train(train_model, optimizer, loss_fn, eval_fn,
                 {'loss': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
-            if B_comet:
-                experiment_comet.log(
-                    {'train/': train_dict, 'valid/': validation_dict, 'lr': optimizer.optimizer.defaults['lr']})
-
             # 这一部分可以根据任务进行调整
-            metric = sorted(validation_eval_dict.items())[2][0]
+            metric = sorted(validation_eval_dict.items())[save_number][0]
 
             if validation_eval_dict[metric] > threshold_value:
                 torch.save(train_model.state_dict(),
@@ -387,13 +382,14 @@ def train_gen_dis(train_model_G, train_model_D,
                   train_load, val_load, epochs,
                   scheduler_generator, scheduler_discriminator,
                   threshold, output_dir, train_writer_summary, valid_writer_summary,
-                  experiment, comet=False, init_epoch=1, mode=None):
+                  experiment, comet=False, init_epoch=1, mode=None, metrix_number=2):
     train_model_G, train_model_D, optimizer_G, optimizer_D, \
         scheduler_generator, scheduler_discriminator, train_load, val_load = \
         accelerator.prepare(train_model_G, train_model_D, optimizer_G, optimizer_D,
                             scheduler_generator, scheduler_discriminator, train_load, val_load)
 
-    def train_process(B_comet, experiment_comet, threshold_value=threshold, init_epoch_num=init_epoch):
+    def train_process(B_comet, experiment_comet, threshold_value=threshold,
+                      init_epoch_num=init_epoch, save_number=metrix_number):
         for epoch in range(init_epoch_num, epochs + init_epoch_num):
 
             print(f'Epoch {epoch}/{epochs}')
@@ -402,38 +398,39 @@ def train_gen_dis(train_model_G, train_model_D,
             train_model_G.train(True)
             train_model_D.train(True)
 
-            train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict = \
-                train_generator_epoch(train_model_G, train_model_D, train_load, loss_gan_g, loss_fn_generator, loss_gan_d,
-                                      eval_fn_generator, optimizer_G, optimizer_D, scheduler_generator, scheduler_discriminator,
-                                      epoch, epochs, mode=mode)
+            train_loss_generator_dict, train_loss_generator_extra_dict, \
+                train_loss_discriminator_dict, train_eval_generator_dict = \
+                train_generator_epoch(train_model_G, train_model_D, train_load,
+                                      loss_gan_g, loss_fn_generator,
+                                      loss_gan_d,
+                                      eval_fn_generator, optimizer_G, optimizer_D,
+                                      scheduler_generator, scheduler_discriminator, epoch, epochs, mode=mode)
 
             with torch.no_grad():
-                validation_loss_dict, validation_eval_dict = validation_epoch(train_model_G, val_load, loss_fn_generator, eval_fn_generator,
+                validation_loss_dict, validation_eval_dict = validation_epoch(train_model_G, val_load,
+                                                                              loss_fn_generator, eval_fn_generator,
                                                                               epoch, epochs, mode=mode)
 
-            train_loss_generator_dict, train_loss_discriminator_dict, train_eval_generator_dict, \
-                validation_loss_dict, validation_eval_dict = Metrics2Value(train_loss_generator_dict), \
+            train_loss_generator_dict, train_loss_generator_extra_dict, train_loss_discriminator_dict, \
+                train_eval_generator_dict, validation_loss_dict, validation_eval_dict = \
+                Metrics2Value(train_loss_generator_dict), \
+                Metrics2Value(train_loss_generator_extra_dict), \
                 Metrics2Value(train_loss_discriminator_dict), \
                 Metrics2Value(train_eval_generator_dict), \
                 Metrics2Value(validation_loss_dict), \
                 Metrics2Value(validation_eval_dict)
 
             train_dict, validation_dict = {'loss_g': train_loss_generator_dict,
+                                           'loss_g_extra': train_loss_generator_extra_dict,
                                            'loss_d': train_loss_discriminator_dict,
                                            'eval': train_eval_generator_dict,
                                            'lr': {'lr_g': optimizer_G.state_dict()['param_groups'][0]['lr'],
                                                   'lr_d': optimizer_D.state_dict()['param_groups'][0]['lr']}}, \
-                {'loss': validation_loss_dict, 'eval': validation_eval_dict}
+                {'loss_g_extra': validation_loss_dict, 'eval': validation_eval_dict}
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
-            if B_comet:
-                experiment_comet.log(
-                    {'train/': train_dict, 'valid/': validation_dict,
-                     'lr': {'lr_g': optimizer_G.state_dict()['param_groups'][0]['lr'],
-                            'lr_d': optimizer_D.state_dict()['param_groups'][0]['lr']}})
-
             # 这一部分可以根据任务进行调整
-            metric = sorted(validation_eval_dict.items())[2][0]
+            metric = sorted(validation_eval_dict.items())[save_number][0]
 
             if validation_eval_dict[metric] > threshold_value:
                 torch.save(train_model_G.state_dict(),
