@@ -4,6 +4,7 @@
 # @Email   : csu1704liuye@163.com | sy2113205@buaa.edu.cn
 # @File    : train.py
 # @Software: PyCharm
+import copy
 import os
 import torch
 
@@ -107,7 +108,9 @@ def eval_mode(output, target):
 
 
 def eval_gan_mode(output, target):
-    return output.mul_(std).add_(mean), target.mul_(std).add_(mean)
+    gan_output, gan_target = copy.deepcopy(output), copy.deepcopy(target)
+    gan_output, gan_target = gan_output.mul_(std).add_(mean), gan_target.mul_(std).add_(mean)
+    return gan_output, gan_target
 
 
 def calculate_eval(eval_fn, eval_dict: dict, output, target, mode='image'):
