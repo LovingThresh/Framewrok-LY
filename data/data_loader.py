@@ -22,11 +22,13 @@ train_transform = A.Compose([
     A.RandomBrightnessContrast(p=0.5),
     A.CoarseDropout(p=0.5),
     A.PixelDropout(p=0.5),
+    A.MotionBlur(blur_limit=10, p=1),
     ToTensorV2(True),
 ])
 
 val_transform = A.Compose([
     A.RandomCrop(512, 512),
+    A.MotionBlur(blur_limit=10, p=1),
     ToTensorV2(True)
 ])
 

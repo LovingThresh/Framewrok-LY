@@ -41,19 +41,19 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 hyper_params = {
-    "mode": 'image',
+    "mode": 'segmentation',
     "ex_number": '3090_Segmentation_EarthQuake',
     "raw_size": (3, 512, 512),
     "crop_size": (3, 512, 512),
     "input_size": (3, 512, 512),
     "batch_size": 4,
-    "learning_rate": 2e-4,
-    "epochs": 50,
-    "threshold": 20,
+    "learning_rate": 1e-4,
+    "epochs": 100,
+    "threshold": 0.5,
     "checkpoint": False,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": 'O:/Project/Motion_Image_Enhancement/New_earthquake_crack_init_model.pt'
+    "check_path": 'generator_init_512.pt'
 }
 
 experiment = object
@@ -111,6 +111,9 @@ if mode == 'segmentation':
     train_loader, val_loader, test_loader = get_BlurImage_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 
     eval_function_mean_iou = torchmetrics.JaccardIndex(num_classes=2).cuda()
+    eval_function_mean_pr = torchmetrics.Precision(num_classes=2).cuda()
+    eval_function_mean_re = torchmetrics.Recall(num_classes=2).cuda()
+    eval_function_mean_f1 = torchmetrics.F1Score(num_classes=2).cuda()
     eval_function_iou = iou
     eval_function_pr = pr
     eval_function_re = re
@@ -122,8 +125,11 @@ if mode == 'segmentation':
     eval_function = {'eval_iou': eval_function_iou,
                      'eval_iou_mean': eval_function_mean_iou,
                      'eval_pr': eval_function_pr,
+                     'eval_pr_mean': eval_function_mean_pr,
                      'eval_re': eval_function_re,
+                     'eval_re_mean': eval_function_mean_re,
                      'eval_f1': eval_function_f1,
+                     'eval_f1_mean': eval_function_mean_f1,
                      'eval_acc': eval_function_acc,
                      }
 

@@ -65,11 +65,7 @@ class data_prefetcher:
             #     self.next_input = self.next_input.half()
             # else:
             self.next_input = self.next_input.float()
-            self.next_input = self.next_input.sub_(self.mean).div_(self.std)
-
             self.next_target = self.next_target.float()
-            if self.mode == 'image':
-                self.next_target = self.next_target.sub_(self.mean).div_(self.std)
 
     def next(self):
         torch.cuda.current_stream().wait_stream(self.stream)
@@ -206,7 +202,7 @@ def train_generator_epoch(train_generator, train_discriminator, train_load,
 
     D_weight = torch.tensor(0.5, dtype=torch.float32, device=Device, requires_grad=True)
     fake_gen_output, target = None, None
-    # train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
+    train_load = data_prefetcher(train_load, MEAN, STD, mode=mode)
 
     for batch in train_load:
         it = it + 1
@@ -305,7 +301,7 @@ def validation_epoch(eval_model, eval_load, loss_fn, eval_fn, epoch, Epochs, mod
 
         inputs, target = batch
         output = eval_model(inputs)
-        loss, validation_loss_dict = \
+        _, validation_loss_dict = \
             calculate_loss(loss_fn, validation_loss_dict, output, target)
         validation_eval_dict = \
             calculate_eval(eval_fn, validation_eval_dict, output, target, mode=mode)
