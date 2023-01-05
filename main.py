@@ -49,11 +49,11 @@ hyper_params = {
     "batch_size": 4,
     "learning_rate": 1e-4,
     "epochs": 100,
-    "threshold": 0.5,
-    "checkpoint": False,
+    "threshold": 0.4,
+    "checkpoint": True,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": 'generator_init_512.pt'
+    "check_path": 'M:/MotionBlur-Segmentation/关键模型/512_Blur_15_21/Epoch_60_eval_24.54957309591359_seg.pt'
 }
 
 experiment = object
@@ -111,9 +111,9 @@ if mode == 'segmentation':
     train_loader, val_loader, test_loader = get_BlurImage_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
 
     eval_function_mean_iou = torchmetrics.JaccardIndex(num_classes=2).cuda()
-    eval_function_mean_pr = torchmetrics.Precision(num_classes=2).cuda()
-    eval_function_mean_re = torchmetrics.Recall(num_classes=2).cuda()
-    eval_function_mean_f1 = torchmetrics.F1Score(num_classes=2).cuda()
+    eval_function_mean_pr = torchmetrics.Precision(num_classes=2, multiclass=True).cuda()
+    eval_function_mean_re = torchmetrics.Recall(num_classes=2, multiclass=True).cuda()
+    eval_function_mean_f1 = torchmetrics.F1Score(num_classes=2, multiclass=True).cuda()
     eval_function_iou = iou
     eval_function_pr = pr
     eval_function_re = re
