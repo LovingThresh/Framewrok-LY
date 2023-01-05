@@ -90,4 +90,4 @@ for data_dir in [train_dir, val_dir, test_dir]:
 
         img = cv2.imread(os.path.join(data_dir, path))
         blur_img = function(img, 45, 10)
-        cv2.imwrite(os.path.join(data_dir[:-3] + 'blur_img', path), blur_img['image'])
+        cv2.imwrite(os.path.join(data_dir[:-3] + 'blur_img_orientation', path), blur_img)
