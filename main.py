@@ -50,7 +50,7 @@ hyper_params = {
     "learning_rate": 1e-4,
     "epochs": 100,
     "threshold": 0.4,
-    "checkpoint": True,
+    "checkpoint": False,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
     "check_path": 'M:/MotionBlur-Segmentation/关键模型/512_Blur_15_21/Epoch_60_eval_24.54957309591359_seg.pt'

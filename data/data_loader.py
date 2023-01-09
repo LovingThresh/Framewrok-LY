@@ -22,13 +22,13 @@ train_transform = A.Compose([
     A.RandomBrightnessContrast(p=0.5),
     A.CoarseDropout(p=0.5),
     A.PixelDropout(p=0.5),
-    A.MotionBlur(blur_limit=10, p=1),
+    # A.MotionBlur(blur_limit=10, p=1),
     ToTensorV2(True),
 ])
 
 val_transform = A.Compose([
     A.RandomCrop(512, 512),
-    A.MotionBlur(blur_limit=10, p=1),
+    # A.MotionBlur(blur_limit=10, p=1),
     ToTensorV2(True)
 ])
 
@@ -37,15 +37,15 @@ val_data_txt = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val.txt'
 test_data_txt = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test.txt'
 
 raw_train_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train/img/'
-raw_train_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train/blur_img/'
+raw_train_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train/blur_img_orientation/'
 raw_train_mask_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/train/mask/'
 
 raw_val_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val/img/'
-raw_val_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val/blur_img/'
+raw_val_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val/blur_img_orientation/'
 raw_val_mask_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/val/mask/'
 
 raw_test_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/img/'
-raw_test_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/blur_img/'
+raw_test_blur_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/blur_img_orientation/'
 raw_test_mask_dir = 'L:/crack_segmentation_in_UAV_images/earthquake_crack/test/mask/'
 
 
