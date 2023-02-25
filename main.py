@@ -32,11 +32,11 @@ print(f"Using {device} device")
 train_comet = False
 
 random.seed(24)
-np.random.seed(24)
-torch.manual_seed(24)
-torch.cuda.manual_seed(24)
-torch.cuda.manual_seed_all(24)
-os.environ['PYTHONASHSEED'] = str(24)
+np.random.seed(42)
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+os.environ['PYTHONASHSEED'] = str(42)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
@@ -44,16 +44,16 @@ hyper_params = {
     "mode": 'segmentation',
     "ex_number": '3090_Segmentation_EarthQuake',
     "raw_size": (3, 512, 512),
-    "crop_size": (3, 512, 512),
-    "input_size": (3, 512, 512),
+    "crop_size": (3, 256, 256),
+    "input_size": (3, 256, 256),
     "batch_size": 4,
     "learning_rate": 1e-4,
     "epochs": 100,
     "threshold": 0.4,
-    "checkpoint": False,
+    "checkpoint": True,
     "Img_Recon": True,
     "src_path": 'E:/BJM/Motion_Image',
-    "check_path": 'M:/MotionBlur-Segmentation/关键模型/512_Blur_15_21/Epoch_60_eval_24.54957309591359_seg.pt'
+    "check_path": 'M:/double_head_generator.pt'
 }
 
 experiment = object
@@ -109,7 +109,7 @@ if mode == 'segmentation':
     generator = define_G(3, 2, 64, 'resnet_9blocks', learn_residual=False, norm='instance', mode=mode)
 
     train_loader, val_loader, test_loader = get_BlurImage_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
-
+    # train_loader, val_loader, test_loader = get_Image_Mask_Dataset(re_size=raw_size, batch_size=batch_size)
     eval_function_mean_iou = torchmetrics.JaccardIndex(num_classes=2).cuda()
     eval_function_mean_pr = torchmetrics.Precision(num_classes=2, multiclass=True).cuda()
     eval_function_mean_re = torchmetrics.Recall(num_classes=2, multiclass=True).cuda()
@@ -162,7 +162,7 @@ if mode == 'segmentation':
     # ===============================================================================
     train(generator, optimizer_ft, loss_function, eval_function,
           train_loader, val_loader, Epochs, exp_lr_scheduler,
-          threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode)
+          threshold, output_dir, train_writer, val_writer, experiment, train_comet, mode=mode, metrix_number=3)
 
 
 elif mode == 'image':

@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 
 train_transform = A.Compose([
     A.RandomScale(scale_limit=(1, 1.2), p=0.5),
-    A.RandomCrop(512, 512),
+    A.RandomCrop(256, 256),
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
     A.RandomRotate90(p=0.5),
@@ -27,7 +27,7 @@ train_transform = A.Compose([
 ])
 
 val_transform = A.Compose([
-    A.RandomCrop(512, 512),
+    A.RandomCrop(256, 256),
     # A.MotionBlur(blur_limit=10, p=1),
     ToTensorV2(True)
 ])

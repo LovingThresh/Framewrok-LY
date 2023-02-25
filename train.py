@@ -429,7 +429,7 @@ def train_gen_dis(train_model_G, train_model_D,
             write_summary(train_writer_summary, valid_writer_summary, train_dict, validation_dict, step=epoch)
 
             # 这一部分可以根据任务进行调整
-            metric = sorted(validation_eval_dict.items())[save_number][2]
+            metric = sorted(validation_eval_dict.items())[save_number][0]
 
             if validation_eval_dict[metric] > threshold_value:
                 torch.save(train_model_G.state_dict(),
